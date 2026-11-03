@@ -54,6 +54,8 @@ If something breaks, [open an issue](https://github.com/veneito/engage-pc-recomp
 
 Want to contribute? Read [CONTRIBUTING.md](CONTRIBUTING.md). PRs go into **`dev`**. Small maintainer documentation edits don't need a PR.
 
+See our [code of conduct](CODE_OF_CONDUCT.md), [security policy](SECURITY.md) and [accessibility statement](ACCESSIBILITY.md).
+
 If you like the project, leave a star. Bug reports and help testing are welcome too.
 
 [Porting notes](docs/engage-port.md) · [Making a release](docs/releasing-engage.md)
