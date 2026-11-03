@@ -31,7 +31,7 @@ From a clean, committed checkout, run this with Python 3.14:
 
 The builder checks the bundled Python, the missing-input error path and the setup window. It scans the package for game content, writes an inventory and makes a checksum file. Check the finished ZIP against that inventory too.
 
-For a public release, merge the reviewed changes from `dev` into `main`, tag that source, and build from it. Upload the checked assets to a draft release first. Verify the uploaded hashes, then publish it.
+For a public release, merge the reviewed changes from `dev` into `main`, tag that source, and build from it. Upload the checked ZIPs to the project's generic package registry, then create the release with `glab release create <tag> --notes-file <file>` and attach each ZIP as a release link whose file path is its file name, so the README's `/-/releases/<tag>/downloads/<name>` links resolve. GitLab has no draft releases: set the release date in the future (`--released-at`) to keep it hidden as an upcoming release, check the hashes, then move the date to now to publish.
 
 ## What to test
 
