@@ -273,7 +273,7 @@ def runtime_object(out, src):
     return out / 'obj' / 'runtime' / rel.with_suffix('.o')
 
 
-def module_glue(layout, linked, hashes, paths, version):
+def module_glue(layout, linked, hashes, paths, version, runtime_version=True):
     """C for build/<version>/modules.c: the layout table, the linked modules' function tables (dispatch.h), the
     expected ExeFS hashes, the game version and the default game paths (host.h)."""
     out = [f'// Module glue written by tools/build_game.py; do not edit. {GENERATED_MARKER}',
@@ -303,8 +303,10 @@ def module_glue(layout, linked, hashes, paths, version):
     game_id = 1 if version == 'engage-v200' else 0
     if game_id:
         number = 200
-    out += [f'const int rt_game_id = {game_id};', f'const int rt_game_version = {number};',
-            f'const char rt_port_version[] = {c_string(port_version())};', '']
+    out += [f'const int rt_game_id = {game_id};', f'const int rt_game_version = {number};']
+    if runtime_version:
+        out.append(f'const char rt_port_version[] = {c_string(port_version())};')
+    out.append('')
     return '\n'.join(out)
 
 
@@ -701,6 +703,7 @@ def mib(n):
 
 
 def main():
+    global RUNTIME
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--version', default='v121', help='game version (default v121)')
     ap.add_argument('--gen', type=Path, help='generated C directory (default generated/<version>)')
@@ -736,7 +739,15 @@ def main():
                                                     f'({", ".join(sorted(INSTALL_SIDE))} and modules.c still compile)')
     ap.add_argument('--expected', type=Path,
                     help='expected hashes (default tools/data/expected-<display version>.json)')
+    ap.add_argument('--game-library', action='store_true', help='Windows Engage: keep game code in engage_game.dll')
+    ap.add_argument('--make-game-runtime', action='store_true', help='build the public Engage runtime without game inputs')
+    ap.add_argument('--runtime-exe', type=Path, help='use this checked, prebuilt Engage runtime and build only the game DLL')
     args = ap.parse_args()
+    if (args.make_game_runtime or args.runtime_exe) and not args.game_library:
+        ap.error('--make-game-runtime and --runtime-exe require --game-library')
+    if args.game_library and (not WIN or args.version != 'engage-v200' or not args.toolchain or args.modules or
+                              args.make_runtime_lib or args.runtime_lib or (args.make_game_runtime and args.runtime_exe)):
+        ap.error('--game-library requires Windows, Engage, --toolchain and all modules; runtime library modes cannot mix')
 
     gen = (args.gen or ROOT / 'generated' / args.version).resolve()
     out = (args.out or ROOT / 'build' / args.version).resolve()
@@ -746,11 +757,11 @@ def main():
              'profile': (args.profile or ROOT / 'build' / ('profile' if args.version == 'v121'
                                                            else f'profile-{args.version}')).resolve()}
     expected = args.expected
-    if not expected:
+    if not expected and not args.make_game_runtime:
         if args.version not in DISPLAY_VERSIONS:
             sys.exit(f'no expected hashes known for {args.version}; pass --expected')
         expected = ROOT / 'tools' / 'data' / f'expected-v{DISPLAY_VERSIONS[args.version]}.json'
-    hashes = json.loads(Path(expected).read_text())['exefs_sha256']
+    hashes = {} if args.make_game_runtime else json.loads(Path(expected).read_text())['exefs_sha256']
     global CLANG, AR, WINDRES, NINJA, TOOLCHAIN_BIN, DEPS
     if args.ninja:
         NINJA = args.ninja.resolve()
@@ -781,10 +792,10 @@ def main():
         if not tool.is_file():
             sys.exit(f'{tool} not found: install ' + ('MSYS2 UCRT64 clang, lld and ninja' if WIN else 'clang, lld and ninja')
                      + ' (docs/building.md)')
-    if not (gen / 'layout.json').is_file():
+    if not args.make_game_runtime and not (gen / 'layout.json').is_file():
         sys.exit(f'{gen / "layout.json"} not found: run the generator first')
 
-    layout = read_layout(gen)
+    layout = [] if args.make_game_runtime else read_layout(gen)
     names = [n for n, _, _ in layout]
     wanted = args.modules.split(',') if args.modules else names
     unknown = [m for m in wanted if m not in names]
@@ -799,15 +810,18 @@ def main():
     missing = [n for n in names if n not in hashes]
     if missing:
         sys.exit(f'{expected}: no exefs_sha256 for {missing}')
-    write_if_changed(out / 'modules.c', module_glue(layout, linked, hashes, paths, args.version))
-    if (paths['romfs'] / 'index.json').is_file():
+    out.mkdir(parents=True, exist_ok=True)
+    if not args.game_library:
+        write_if_changed(out / 'modules.c', module_glue(layout, linked, hashes, paths, args.version))
+    if args.make_game_runtime:
+        pass
+    elif (paths['romfs'] / 'index.json').is_file():
         count, size, dt = romfs_index.write(paths['romfs'], out)
         print(f'romfs index: {count} files, {mib(size)}, {dt:.1f} s')
     else:
         romfs_index.write_placeholder(out)
         print(f'build_game: warning: no {paths["romfs"] / "index.json"}; {EXE} will have no RomFS', file=sys.stderr)
     copy_romfs_patches(args.version, out)
-    global RUNTIME
     RUNTIME = (args.runtime or RUNTIME).resolve()
     stale = stale_shaders(RUNTIME)
     if stale:
@@ -815,7 +829,9 @@ def main():
     skip = {s for s in args.skip_runtime.split(',') if s}
     main_out = (ROOT / 'build' / args.version).resolve()
     pairs = None
-    if args.make_runtime_lib:
+    if args.game_library:
+        why = 'separate game DLL'
+    elif args.make_runtime_lib:
         mods, linked, why = {}, [], ''
     elif args.full_build:
         why = '--full-build'
@@ -836,8 +852,31 @@ def main():
     runtime_lib = args.runtime_lib.resolve() if args.runtime_lib else None
     if runtime_lib and not runtime_lib.is_file():
         sys.exit(f'{runtime_lib} not found: build it with --make-runtime-lib')
-    text, objs, exe = ninja_file(gen, out, mods, jobs, skip, pairs is not None, runtime_lib,
-                                 args.make_runtime_lib)
+    if args.game_library:
+        import game_library
+        compatibility = game_library.compatibility_id(ROOT, RUNTIME)
+        write_if_changed(out / 'game_contract.h', '// Public runtime/compiler contract; contains no game data.\n'
+                         f'#define GAME_COMPATIBILITY_ID "{compatibility}"\n'
+                         f'#define GAME_RUNTIME_VERSION {c_string(port_version())}\n')
+        write_if_changed(out / 'engage.def', 'LIBRARY engage.exe\nEXPORTS\n' + '\n'.join(game_library.EXPORTS) + '\n')
+        reuse_game = False
+        if not args.make_game_runtime:
+            private = game_library.private_glue(sys.modules[__name__], layout, linked, hashes, paths, args.version)
+            write_if_changed(out / 'game_private.c', private)
+            headers = [out / 'romfs_config.h', gen / 'layout.h']
+            if (gen / 'patches.h').is_file():
+                headers.append(gen / 'patches.h')
+            game_key = game_library.fingerprint(compatibility, private, mods, GEN_FLAGS, headers)
+            reuse_game = not args.full_build and game_library.reusable(out, game_key)
+            if reuse_game:
+                print('build_game: reusing verified engage_game.dll; no game-code compilation required', flush=True)
+        if args.runtime_exe:
+            game_library.check_runtime(args.runtime_exe.resolve(), compatibility)
+        text, objs, exe = game_library.ninja_file(sys.modules[__name__], gen, out, mods, jobs, skip,
+                                                reuse_game, args.make_game_runtime, args.runtime_exe)
+    else:
+        text, objs, exe = ninja_file(gen, out, mods, jobs, skip, pairs is not None, runtime_lib,
+                                   args.make_runtime_lib)
     write_if_changed(out / 'build.ninja', text)
 
     env = dict(os.environ)
@@ -868,6 +907,14 @@ def main():
     if args.make_runtime_lib:
         print(f'{below_root(exe)}: {mib(exe.stat().st_size)}')
         return
+    if args.game_library:
+        if not args.make_game_runtime:
+            game_library.record(out, game_key, compatibility)
+        if args.runtime_exe:
+            target = out / EXE
+            if args.runtime_exe.resolve() != target.resolve():
+                shutil.copy2(args.runtime_exe, target)
+        game_library.record_runtime(out / EXE, compatibility)
     for dll in dlls:   # dynamic SDL3 (zlib) and its libiconv (LGPL, unmodified DLL), found next to totk.exe
         shutil.copy2(dll, exe.parent / dll.name)
     sections, image = pe_sections(exe) if WIN else elf_sections(exe)

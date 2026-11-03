@@ -40,7 +40,7 @@
 #include "cfg.h"
 #include "gfx.h"
 #include "host.h"
-#include "layout.h"
+#include "module_layout.h"
 #include "platform/platform.h"
 
 #define STEP_SAMPLES 5

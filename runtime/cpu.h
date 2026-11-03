@@ -74,7 +74,12 @@ typedef uint64_t __attribute__((aligned(1), may_alias)) u64u;
 typedef uint8_t __attribute__((may_alias)) u8a;
 
 // Function-entry profiler (runtime/fnprof.c, LARECOMP_FNPROF): one predictable branch per call when off.
-extern volatile int g_fnprof;
+#if defined(RT_GAME_DLL) && defined(_WIN32)
+#define RT_GAME_DATA __declspec(dllimport)
+#else
+#define RT_GAME_DATA
+#endif
+extern RT_GAME_DATA volatile int g_fnprof;
 void fnprof_hit(uint64_t addr, uint64_t lr, uint64_t x0);
 #define FN_ENTER(a) do { if (__builtin_expect(g_fnprof, 0)) fnprof_hit(a, c->x[30], c->x[0]); } while (0)
 

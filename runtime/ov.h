@@ -12,5 +12,5 @@ int ov_probe_exit_sections(void);
 int ov_probe_network_account(void);
 int ov_handheld(void);                     // TOTK_OPERATION_MODE=handheld (default docked); fatal on another value
 const char *ov_language(void);             // the game's language, a Switch language code ("en-US", "zh-Hans", ...)
-const char *ov_shared_font_dir(char *buf, size_t n);   // TOTK_SHARED_FONTS, else <romfs>/../../firmware/shared-fonts
+const char *ov_shared_font_dir(char *buf, size_t n);   // configured path (exe-relative), sibling fonts/shared-fonts, extraction
 uint64_t ov_bfttf_size(const uint8_t *p, uint64_t len); // decoded font size of a BFTTF image, 0 if it is not one

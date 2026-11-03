@@ -127,10 +127,11 @@ void rec_drain(void) {
 void rec_begin(VkCommandBuffer cb) {
     static int mode = -1;
     if (mode < 0) {
-        // Default on for every GPU. AMD drivers once lost the device with the recorder (issues #5 and #40); after
+        // Default off for Engage, matching its setup/launcher; retain TotK's default. AMD drivers once lost the device
+        // with the recorder (issues #5 and #40); after
         // vk_mem_note_recording kept objects alive until their submission completed and the recorder began ending
         // its own parts (rec_end_cb), RDNA 1 and 2 cards ran with it on and off without a loss or a white scene.
-        mode = rt_knob("VK_RECORDER", "1");
+        mode = rt_knob("VK_RECORDER", RT_ENGAGE ? "0" : "1");
         if (mode) {
             plat_event_init(&wake_ev, 0, 0);
             rec_prio = plat_thread_priority_get();

@@ -21,7 +21,10 @@ extern "C" {
 #include "ui_text.h"
 // host.h pulls in cpu.h, which is C only: the one function needed from it, as declared there.
 void rt_log(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+#include "game_library.h"
+#ifndef RT_GAME_LIBRARY
 extern const int rt_game_id;
+#endif
 }
 
 static const ImU32 kGold = IM_COL32(236, 194, 84, 255);

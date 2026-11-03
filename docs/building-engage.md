@@ -43,9 +43,12 @@ The extractor checks the packages, update version and content integrity. The pac
 .\Run-Engage.cmd
 ```
 
-Lower `--jobs` if your machine is running out of memory. The first build takes a while. Generated game code, the built executable and the icon extracted from your game all stay private.
+Lower `--jobs` if your machine is running out of memory. The first build takes a while.
+Development builds produce a public `engage.exe` runtime and a private `engage_game.dll`
+beside it. Both are required to play. Generated game code and the DLL stay private.
+See [DLL builds and compatible updates](engage-game-library.md).
 
-The launcher sets Vulkan and the shared-font path, with the experimental recorder turned off. **F1** opens settings, **F10** changes the performance overlay, and **F11** toggles fullscreen. Keep `build/profile-engage` when rebuilding—that's your player data.
+You can launch `engage.exe` directly. Vulkan is the default, the experimental recorder is off for Engage unless enabled in settings, and fonts are found from the executable's folder or the extracted firmware tree. `Run-Engage.cmd` remains an optional developer helper. **F1** opens settings, **F10** changes the performance overlay, and **F11** togggles fullscreen. Keep `build/profile-engage` when rebuilding—that's your player data.
 
 The Engage patch table enables the game's 60 FPS timing path and checks the main
 module's build ID and original instruction before generation. F1's Game tab offers

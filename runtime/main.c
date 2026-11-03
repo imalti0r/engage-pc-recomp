@@ -492,6 +492,15 @@ static void portable_paths(RtConfig *c) {
 }
 
 int main(int argc, char **argv) {
+#ifdef RT_GAME_LIBRARY
+    // Package checks can validate the public runtime's font before the player's DLL exists.
+    if (argc == 2 && !strcmp(argv[1], "--probe-menu-font")) {
+        int ok = menu_font_check();
+        printf("menu-font: %s\n", ok ? "passed" : "FAILED");
+        return ok ? 0 : 1;
+    }
+    rt_game_library();
+#endif
     mem_init();   // first: claim the guest address space before anything else can land there; reads totk.ini
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);

@@ -18,6 +18,7 @@
 #include "fs.h"
 #include "gfx.h"
 #include "nvn_api.h"
+#include "ov.h"
 #include "platform/platform.h"
 #include "vk.h"
 #include "platform/platform.h"
@@ -338,6 +339,10 @@ static void prewarm_main(void *arg) {
 }
 
 void rt_boot(void) {
+    if (RT_ENGAGE) {
+        char fonts[PLAT_PATH_MAX];
+        rt_log("boot: shared font directory %s", ov_shared_font_dir(fonts, sizeof fonts));
+    }
     check_npdm();
     if (!rt_config()->shot) vk_pipeline_async_enable();   // a --shot image must not depend on build timing
     // Shaders and pipelines recorded in earlier runs are made ready while the modules load; the guest waits for them.
