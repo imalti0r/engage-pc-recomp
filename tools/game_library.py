@@ -117,6 +117,8 @@ def ninja_file(build, gen, out, mods, jobs, skip, reuse=False, runtime_only=Fals
             lines[i] += ' -include ' + build.cmd_path(build.RUNTIME / 'game_imports.h')
         if line.startswith('rtflags = '):
             lines[i] += ' -DRT_GAME_LIBRARY'
+        if line.startswith('ldflags = '):
+            lines[i] += ' -mwindows'
     dll = out / DLL_NAME
     definition = out / 'engage.def'
     if reuse and not runtime_only:

@@ -11,8 +11,12 @@ const char rt_port_version[] = GAME_RUNTIME_VERSION;
 static const GameLibrary *library;
 
 static void library_error(const char *why) {
-    fprintf(stderr, "Engage game library: %s. Run Engage Setup to rebuild the game DLL.\n", why);
+    char message[512];
+    snprintf(message, sizeof message, "Engage game library: %s. Run Engage Setup to rebuild the game DLL.", why);
+    fprintf(stderr, "%s\n", message);
     fflush(stderr);
+    if (GetFileType(GetStdHandle(STD_ERROR_HANDLE)) == FILE_TYPE_UNKNOWN)
+        MessageBoxA(NULL, message, "Engage could not start", MB_OK | MB_ICONERROR);
     _Exit(70);
 }
 

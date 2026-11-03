@@ -252,7 +252,7 @@ class Pipeline:
         settings = self.dest / 'engage.ini'
         if not settings.exists():
             settings.write_text(ini.set_language('[graphics]\ngpu = vulkan\nvk_recorder = 0\n\n[system]\nshared_fonts = fonts\n\n', self.form.lang), encoding='utf-8')
-        launcher = '@echo off\ncd /d "%~dp0"\nset TOTK_GPU=vulkan\nset TOTK_VK_RECORDER=0\nset "TOTK_SHARED_FONTS=%~dp0fonts"\nstart "" "%~dp0engage.exe"\n'
+        launcher = '@echo off\n"%~dp0engage.exe" %*\nif errorlevel 1 pause\n'
         (self.dest / 'Play Engage.cmd').write_text(launcher, encoding='utf-8')
         self.deploy_game()
         with (self.dest / 'engage.exe').open('rb') as stream:

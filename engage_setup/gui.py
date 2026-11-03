@@ -70,13 +70,9 @@ class App(BaseApp):
         from pathlib import Path
         dest = Path(self.model.dest)
         try:
-            subprocess.Popen([str(dest / 'engage.exe')], cwd=dest, env=play_environment(dest))
+            subprocess.Popen([str(dest / 'engage.exe')], cwd=dest)
         except OSError as error:
             messagebox.showerror('Engage could not start', str(error), parent=self.root)
-
-
-def play_environment(dest):
-    return dict(os.environ, TOTK_GPU='vulkan', TOTK_VK_RECORDER='0', TOTK_SHARED_FONTS=str(dest / 'fonts'))
 
 
 def main():

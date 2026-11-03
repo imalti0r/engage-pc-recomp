@@ -25,7 +25,7 @@ Python, the compiler and the extractor come with setup. You don't need to instal
 1. Download the [Windows setup ZIP](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.5/downloads/Engage-Setup-0.1.0-alpha.5-windows.zip) and **extract the entire ZIP**. Keep its files and folders together. Checksums are on the [release page](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.5).
 2. Run **Engage-Setup.exe** and fill in the file paths. Make sure the update is **2.0.0**. For firmware, pick the folder with the NCA files inside, not the ZIP. Add either DLC and `title.keys` if needed.
 3. Pick a separate, empty install folder, like `D:\Games\Engage`, then click **Install Engage**. Allow around 20–60 minutes the first time. Your CPU and drive will affect how long it takes.
-4. When setup finishes, click **Play Engage**. After that, launch through **Play Engage.cmd** in your install folder. Press **F1** for settings and controls.
+4. When setup finishes, click **Play Engage**. After that, double-click **engage.exe** in your install folder, or create a Windows shortcut to it. Press **F1** for settings and controls. **Play Engage.cmd** is optional for troubleshooting.
 
 Your original dumps aren't changed. The installed game icon and shared fonts come from your files. Keep the built game private—it contains game code.
 
@@ -46,7 +46,8 @@ Inside your install folder:
 
 - `profile` holds your saves and player data. Back it up before experimenting.
 - `engage.ini` holds your settings.
-- `Play Engage.cmd` starts the game with the graphics and font paths set.
+- `engage.exe` starts the game directly and finds its fonts and profile beside it. Shortcuts work from other folders too.
+- `Play Engage.cmd` is an optional troubleshooting launcher that keeps an error visible if startup fails.
 
 Setup leaves existing profiles and settings alone. The first time you see an effect, the game may pause while it builds shaders. Save/load, progress after the first battle and long sessions still need testing. See [what's working](../README.md#whats-working) for the current status.
 

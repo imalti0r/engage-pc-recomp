@@ -16,7 +16,7 @@ Setup works much like TotK Recomp: pick your files, let it build, then play. Pyt
 1. Download the Windows setup ZIP above and extract the whole thing.
 2. Open **Engage-Setup.exe**. Select your base game, **2.0.0** update, keys and extracted firmware folder. Both DLCs are optional.
 3. Pick an empty install folder with **40 GiB free** and click **Install Engage**.
-4. Once it's done, click **Play Engage**. Use **Play Engage.cmd** in that folder next time. **F1** opens settings.
+4. Once it's done, click **Play Engage**. Next time, double-click **engage.exe** in that folder or create a Windows shortcut to it. **F1** opens settings. The CMD file is optional for troubleshooting.
 
 ![Engage Setup](docs/screenshots/setup.png)
 

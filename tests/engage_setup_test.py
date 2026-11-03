@@ -121,6 +121,9 @@ class SetupTest(unittest.TestCase):
             self.assertTrue((root / 'engage.exe').exists())
             self.assertTrue((root / 'romfs-index.bin').exists())
             self.assertTrue((root / 'engage_game.dll').exists())
+            launcher = (root / 'Play Engage.cmd').read_text()
+            self.assertNotIn('TOTK_', launcher)
+            self.assertIn('%*', launcher)
 
     def test_failed_pair_replacement_restores_previous_executable_and_dll(self):
         with tempfile.TemporaryDirectory() as temp:
