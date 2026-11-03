@@ -1,8 +1,9 @@
-// Colour adjustment on the present (vk_color.h): brightness, contrast, saturation and gamma of the game's picture, after
+// Colour adjustment on the present (vk.h): brightness, contrast, saturation and gamma of the game's picture, after
 // the game and before the FSR 1 pass or the blit scale it to the window. Settings TOTK_COLOR_BRIGHTNESS (-30..30, %
 // added), TOTK_COLOR_CONTRAST and TOTK_COLOR_SATURATION (%, 100 = unchanged) and TOTK_COLOR_GAMMA (exponent, 1 =
-// unchanged), read when the settings change; the menu's colour profiles only write these four. At the default values
-// nothing is recorded and the present is what it was. Design and preset values: STS78721's colour profiles (issue #136).
+// unchanged), read when the settings change; the menu's colour profiles only write these four. sRGB images also pass
+// through an unchanged UNORM view to preserve display-encoded bytes before the UNORM swapchain blit or FSR samples.
+// Design and preset values: STS78721's colour profiles (issue #136).
 //
 // One compute pass (shaders/color_grade.comp) reads the crop rectangle of the game's image and writes an RGBA16F image
 // of its size, which present_image then hands to FSR or the blit in place of the game's image. The HUD is part of that
@@ -137,7 +138,11 @@ static void barrier(VkCommandBuffer cb, VkImage img, VkImageLayout from, VkPipel
 }
 
 VkImage vk_color_record(VkCommandBuffer cb, unsigned slot, VkImage src, VkFormat fmt, const int crop[4]) {
-    if (!adjusting()) return VK_NULL_HANDLE;
+    int adjusted = adjusting();
+    // Sampling/blitting sRGB decodes to linear; presentation needs the game's encoded display values.
+    if (fmt == VK_FORMAT_R8G8B8A8_SRGB) fmt = VK_FORMAT_R8G8B8A8_UNORM;
+    else if (fmt == VK_FORMAT_B8G8R8A8_SRGB) fmt = VK_FORMAT_B8G8R8A8_UNORM;
+    else if (!adjusted) return VK_NULL_HANDLE;
     VkCtx *c = vk_ctx();
     if (!C.tried) init(c);
     if (!C.ok || !ensure_image(c, (uint32_t)crop[2], (uint32_t)crop[3])) return VK_NULL_HANDLE;

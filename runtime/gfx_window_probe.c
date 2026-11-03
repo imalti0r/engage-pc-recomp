@@ -4,8 +4,10 @@
 // to count validation errors.
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #include "gfx.h"
+#include "cfg.h"
 #include "gfx_wsys.h"
 #include "input.h"
 #include "ui/menu.h"
@@ -22,6 +24,10 @@ typedef struct {
     VkCommandPool pool;
     VkCommandBuffer cb;
     VkFence fence;
+    VkFormat format;
+    VkImageLayout layout;
+    int srgb;
+    float gamma;
 } Source;
 
 static int fail(const char *what) {
@@ -39,12 +45,17 @@ static void barrier(VkCommandBuffer cb, VkImage img, VkImageLayout from, VkImage
     vkCmdPipelineBarrier2(cb, &d);
 }
 
-static int source_create(Source *s) {
+static int source_create(Source *s, VkFormat format) {
     VkCtx *c = vk_ctx();
+    s->format = format;
+    s->srgb = format == VK_FORMAT_R8G8B8A8_SRGB || format == VK_FORMAT_B8G8R8A8_SRGB;
+    s->gamma = 1.0f;
+    s->layout = s->srgb ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     VkImageCreateInfo ii = {.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, .imageType = VK_IMAGE_TYPE_2D,
-                            .format = VK_FORMAT_R8G8B8A8_UNORM, .extent = {SRC_W, SRC_H, 1}, .mipLevels = 1, .arrayLayers = 1,
+                            .flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT,
+                            .format = format, .extent = {SRC_W, SRC_H, 1}, .mipLevels = 1, .arrayLayers = 1,
                             .samples = VK_SAMPLE_COUNT_1_BIT, .tiling = VK_IMAGE_TILING_OPTIMAL,
-                            .usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                            .usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED};
     VmaAllocationCreateInfo ai = {.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE};
     if (vmaCreateImage(c->vma, &ii, &ai, &s->img, &s->alloc, NULL) != VK_SUCCESS) return 0;
@@ -73,14 +84,14 @@ static int source_clear(Source *s, int first, const float rgba[4]) {
     VkCommandBufferBeginInfo bi = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
                                    .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
     vkBeginCommandBuffer(s->cb, &bi);
-    barrier(s->cb, s->img, first ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    barrier(s->cb, s->img, first ? VK_IMAGE_LAYOUT_UNDEFINED : s->layout,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_2_TRANSFER_BIT, first ? 0 : VK_ACCESS_2_TRANSFER_READ_BIT,
             VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
     VkClearColorValue cv;
     memcpy(cv.float32, rgba, sizeof cv.float32);
     VkImageSubresourceRange rng = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     vkCmdClearColorImage(s->cb, s->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &cv, 1, &rng);
-    barrier(s->cb, s->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    barrier(s->cb, s->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, s->layout,
             VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
             VK_ACCESS_2_TRANSFER_READ_BIT);
     vkEndCommandBuffer(s->cb);
@@ -101,12 +112,17 @@ static uint8_t to_byte(float f) { return (uint8_t)(f * 255.0f + 0.5f); }
 static int present_and_check(Source *s, int first, int i, int *w_out, int *h_out) {
     float rgba[4] = {(float)((i * 7) & 255) / 255.0f, (float)((i * 13) & 255) / 255.0f, (float)((i * 29) & 255) / 255.0f, 1.0f};
     if (!source_clear(s, first, rgba)) return 1;
-    vk_present_image(s->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_FORMAT_R8G8B8A8_UNORM, SRC_W, SRC_H, NULL);
+    vk_present_image(s->img, s->layout, s->format, SRC_W, SRC_H, NULL);
     const uint8_t *px;
     int w, h;
     VkFormat fmt;
     if (!vk_present_captured(&px, &w, &h, &fmt)) { printf("probe-window: frame %d was not presented\n", i); return 2; }
     uint8_t rgb[3] = {to_byte(rgba[0]), to_byte(rgba[1]), to_byte(rgba[2])};
+    if (s->srgb)
+        for (int j = 0; j < 3; j++)
+            rgb[j] = to_byte(rgba[j] <= 0.0031308f ? 12.92f * rgba[j] : 1.055f * powf(rgba[j], 1.0f / 2.4f) - 0.055f);
+    if (s->gamma != 1.0f)
+        for (int j = 0; j < 3; j++) rgb[j] = to_byte(powf(rgb[j] / 255.0f, s->gamma));
     uint8_t want[4];
     if (fmt == VK_FORMAT_B8G8R8A8_UNORM) { want[0] = rgb[2]; want[1] = rgb[1]; want[2] = rgb[0]; }
     else if (fmt == VK_FORMAT_R8G8B8A8_UNORM) { want[0] = rgb[0]; want[1] = rgb[1]; want[2] = rgb[2]; }
@@ -120,7 +136,17 @@ static int present_and_check(Source *s, int first, int i, int *w_out, int *h_out
     for (long k = 0, n = (long)w * h; k < n; k++) {
         int x = (int)(k % w), y = (int)(k / w);
         uint32_t e = x >= r[0] && x < r[0] + r[2] && y >= r[1] && y < r[1] + r[3] ? wv : black;
-        if (p[k] != e) {
+        int mismatch = p[k] != e;
+        if (mismatch && s->srgb) {
+            // sRGB conversion rounds by one byte; FSR's half-float EASU/RCAS adds a few more.
+            const uint8_t *got = (const uint8_t *)&p[k], *expected = (const uint8_t *)&e;
+            int tolerance = !strcmp(cfg_value("TOTK_UPSCALER"), "fsr") ? 3 : 1;
+            mismatch = 0;
+            for (int j = 0; j < 4; j++)
+                if ((int)got[j] - expected[j] > (j == 3 ? 0 : tolerance) ||
+                    (int)expected[j] - got[j] > (j == 3 ? 0 : tolerance)) mismatch = 1;
+        }
+        if (mismatch) {
             printf("probe-window: frame %d pixel %ld (%d, %d) is %08x, expected %08x\n", i, k, x, y, p[k], e);
             return 4;
         }
@@ -137,7 +163,7 @@ int probe_window(void) {
     if (!c) return fail("no Vulkan device");
     vk_present_capture(1);
     Source s = {0};
-    if (!source_create(&s)) return fail("source image");
+    if (!source_create(&s, VK_FORMAT_R8G8B8A8_UNORM)) return fail("source image");
 
     int w = 0, h = 0;
     for (int i = 0; i < FRAMES; i++)
@@ -187,6 +213,19 @@ int probe_window(void) {
         return fail("swapchain size after resize");
     }
     printf("probe-window: resized to %dx%d, presents still exact\n", w, h);
+    const VkFormat srgb_formats[] = {VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_B8G8R8A8_SRGB};
+    for (int f = 0; f < 2; f++) {
+        Source srgb = {0};
+        if (!source_create(&srgb, srgb_formats[f])) return fail("sRGB source image");
+        for (int i = 0; i < 8; i++)
+            if (present_and_check(&srgb, i == 0, 17 + i * 19, &w, &h)) return fail("sRGB display encoding");
+        cfg_set("TOTK_COLOR_GAMMA", "2");
+        srgb.gamma = 2.0f;
+        if (present_and_check(&srgb, 0, 63, &w, &h)) return fail("sRGB colour adjustment");
+        cfg_set("TOTK_COLOR_GAMMA", "1");
+        source_destroy(&srgb);
+    }
+    printf("probe-window: RGBA/BGRA sRGB display bytes and colour adjustment preserved\n");
     vk_present_capture(0);
 
     // Vsync: count ticks between two tick edges about 5 s apart.
