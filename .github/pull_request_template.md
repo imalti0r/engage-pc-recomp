@@ -1,5 +1,6 @@
 Please target **`dev`** as the base branch for contributions. Maintainer release
 PRs promote `dev` into `main`.
+Small documentation or wording edits by maintainers do not need a PR.
 
 ## Summary
 

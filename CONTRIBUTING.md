@@ -34,6 +34,9 @@ or fix branch from the latest `dev`, then select `dev` as the PR's base branch.
 Link the related issue and describe the change and its validation. For bugs,
 record the reproduction, diagnosis and test results in the issue.
 
+Maintainers may apply small documentation or wording edits directly, without a
+PR. Code fixes and features follow the issue/PR workflow below.
+
 Our workflow is **issue → feature/fix branch → PR into `dev` → release PR into
 `main` → release**. `dev` is the integration branch; `main` is the stable release
 branch. Maintainers open a separate PR from `dev` into `main` when changes are
