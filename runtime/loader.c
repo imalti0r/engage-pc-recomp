@@ -11,7 +11,7 @@
 #include <string.h>
 
 #include "host.h"
-#include "layout.h"
+#include "module_layout.h"
 #include "platform/platform.h"
 
 // hostfn.c, for the loader only.

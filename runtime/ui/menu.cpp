@@ -35,6 +35,7 @@ static int g_font_bad;
 
 extern "C" {
 #include "cfg.h"
+#include "game_library.h"
 #include "input.h"
 #include "input_map.h"
 #include "perfmon.h"
@@ -48,8 +49,10 @@ void vk_queue_lock(void);
 void vk_queue_unlock(void);
 void res_sizes(unsigned out[2], unsigned scene[2]);
 double frame_step_limit_hz(void);
+#ifndef RT_GAME_LIBRARY
 extern const int rt_game_id;
 extern const int rt_game_version;
+#endif
 // fs.h (romfs.c): romfs-patches-xbox was next to romfs-index.bin at start, and was loaded.
 int romfs_xbox_prompts_ready(void);
 int romfs_xbox_prompts_active(void);

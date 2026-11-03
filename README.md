@@ -44,13 +44,13 @@ Testing so far has been on Windows 11 with an RTX 4060. Other GPUs, clean Window
 
 The game isn't included. You'll need your own base game, 2.0.0 update, keys and firmware. Setup builds the executable on your PC and leaves your original dumps alone.
 
-Please don't upload game files, keys, firmware, saves, extracted assets, generated code or your built `engage.exe` here. The built executable contains game code and needs to stay private.
+Please don't upload game files, keys, firmware, saves, extracted assets or generated code here. Alpha.5's built `engage.exe` contains game code and stays private. Development builds move that code into `engage_game.dll`, which also stays private; their separately built runtime contains no game code.
 
 ## Building from source
 
 Follow [this guide](docs/building-engage.md) if you want to build or work on the port yourself. Source builds need developer tools; the setup ZIP already includes what players need.
 
-For a source build, use `Run-Engage.cmd`. Settings are in `engage.ini`, logs are in `logs/engage.log` next to the executable, and saves stay under `build/profile-engage`.
+For a source build, use `Run-Engage.cmd`. Keep `engage_game.dll` beside `engage.exe`; [DLL packaging](docs/engage-game-library.md) explains compatible runtime updates. Settings are in `engage.ini`, logs are in `logs/engage.log` next to the executable, and saves stay under `build/profile-engage`.
 
 ## Helping out
 

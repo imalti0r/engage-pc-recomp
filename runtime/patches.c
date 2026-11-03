@@ -18,21 +18,32 @@
 
 #include "host.h"
 
-#if __has_include("patches.h")
+#ifdef RT_GAME_LIBRARY
+#define RT_PATCH_COUNT GAME_LIBRARY_PATCHES
+#define RT_PATCH_PAGE (rt_game_library()->patch_page)
+#define PATCH_COUNT (rt_game_library()->patch_count)
+#define sets (rt_game_library()->patches)
+#elif __has_include("patches.h")
 #include "patches.h"
 #endif
 #ifndef RT_PATCH_COUNT
 #define RT_PATCH_COUNT 0
 #endif
 
+#ifndef PATCH_COUNT
+#define PATCH_COUNT RT_PATCH_COUNT
+#endif
+
 uint8_t rt_patch_on[RT_PATCH_COUNT > 0 ? RT_PATCH_COUNT : 1];   // read by the generated C at every patched site
 
 #if RT_PATCH_COUNT
-static const struct { const char *name, *env; int on; } sets[] = {
+#ifndef RT_GAME_LIBRARY
+static const RtPatchSet sets[] = {
 #define X(i, n, e, d) {#n, e, d},
     RT_PATCH_SETS(X)
 #undef X
 };
+#endif
 static void *page;
 #endif
 
@@ -44,7 +55,7 @@ void rt_patches_init(void) {
     char list[512];
     size_t n = 0;
     list[0] = 0;
-    for (int i = 0; i < RT_PATCH_COUNT; i++) {
+    for (int i = 0; i < PATCH_COUNT; i++) {
         const char *e = cfg_get(sets[i].env);
         // a set with a row in the settings table takes its default from there; the generated default serves the rest
         rt_patch_on[i] = (uint8_t)(cfg_meta(sets[i].env) ? cfg_bool(sets[i].env) : e && *e ? strcmp(e, "0") != 0 : sets[i].on);
@@ -58,21 +69,21 @@ void rt_patches_init(void) {
 
 int rt_patch_set(const char *name) {
 #if RT_PATCH_COUNT
-    for (int i = 0; i < RT_PATCH_COUNT; i++)
+    for (int i = 0; i < PATCH_COUNT; i++)
         if (!strcmp(sets[i].name, name)) return i;
 #endif
     (void)name;
     return -1;
 }
 
-int rt_patch_enabled(int set) { return set >= 0 && set < RT_PATCH_COUNT && rt_patch_on[set]; }
+int rt_patch_enabled(int set) { return set >= 0 && set < PATCH_COUNT && rt_patch_on[set]; }
 
 void rt_patch_disable(int set) {
-    if (set >= 0 && set < RT_PATCH_COUNT) rt_patch_on[set] = 0;
+    if (set >= 0 && set < PATCH_COUNT) rt_patch_on[set] = 0;
 }
 
 void rt_patch_switch(int set, int on) {
-    if (set >= 0 && set < RT_PATCH_COUNT) __atomic_store_n(&rt_patch_on[set], (uint8_t)(on != 0), __ATOMIC_RELAXED);
+    if (set >= 0 && set < PATCH_COUNT) __atomic_store_n(&rt_patch_on[set], (uint8_t)(on != 0), __ATOMIC_RELAXED);
 }
 
 void *rt_patch_page(void) {

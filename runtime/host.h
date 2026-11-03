@@ -180,14 +180,24 @@ uint8_t *ldr_read_verified(const char *dir, const char *file, size_t *len);   //
                                                            // modules.c (fatal on mismatch); free() it
 
 // Written by tools/build_game.py into build/<version>/modules.c.
-typedef struct { const char *file, *sha256; } RtFileHash;
+typedef struct RtFileHash { const char *file, *sha256; } RtFileHash;
+#ifdef RT_GAME_LIBRARY
+#define rt_exefs_sha256 (rt_game_library()->hashes)
+#define rt_exefs_sha256_count (rt_game_library()->hash_count)
+#define rt_default_exefs (rt_game_library()->exefs)
+#define rt_default_romfs (rt_game_library()->romfs)
+#define rt_default_profile (rt_game_library()->profile)
+#else
 extern const RtFileHash rt_exefs_sha256[];                 // tools/data/expected-<version>.json "exefs_sha256"
 extern const int rt_exefs_sha256_count;
 extern const char rt_default_exefs[], rt_default_romfs[], rt_default_profile[];
 extern const int rt_game_version;                          // the game build: 111 (1.1.1), 121 (1.2.1) or 143 (1.4.3)
+#endif
 extern const char rt_port_version[];                       // VERSION at the build's root: 0.1.0, 0.1.0+973c626 in a release
 #define RT_V111 (rt_game_version == 111)                    // 1.1.1: its own boot constants and data slots
+#ifndef RT_GAME_LIBRARY
 extern const int rt_game_id;                               // 0 TotK, 1 Engage
+#endif
 #define RT_ENGAGE (rt_game_id == 1)
 #define RT_V143 (!RT_ENGAGE && rt_game_version >= 143)
 

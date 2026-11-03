@@ -21,7 +21,7 @@
 #include "cfg.h"
 #include "host.h"
 
-#if __has_include("patches.h")
+#if !defined(RT_GAME_LIBRARY) && __has_include("patches.h")
 #include "patches.h"
 #include "platform/platform.h"
 #endif

@@ -14,7 +14,7 @@
 
 #include "cfg.h"
 #include "host.h"
-#include "layout.h"
+#include "module_layout.h"
 #include "platform/platform.h"
 
 #define PAGE 0x1000ull

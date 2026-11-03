@@ -152,6 +152,13 @@ def build(out):
     (work / 'launcher.rc').write_text(f'1 ICON "{(out / "runtime/engage-setup.ico").as_posix()}"\n1 24 "{(ROOT / "runtime/totk.manifest").as_posix()}"\n')
     upstream.run([out / 'llvm/bin/llvm-windres.exe', work / 'launcher.rc', '-O', 'coff', '-o', work / 'launcher.o'])
     upstream.run([clang, '-O2', '-mwindows', work / 'launcher.c', work / 'launcher.o', '-o', out / 'Engage-Setup.exe'])
+    runtime_build = ROOT / 'build/release/engage-public-runtime'
+    upstream.run([out / 'python/python.exe', '-I', out / 'tools/build_engage.py', '--runtime-only',
+                  '--out', runtime_build, '--runtime', out / 'runtime', '--toolchain', out / 'llvm',
+                  '--deps', out / 'runtime/deps', '--ninja', binary / 'ninja.exe', '--jobs', '8'], cwd=out)
+    for name in ('engage.exe', 'engage.json'):
+        shutil.copy2(runtime_build / name, binary / name)
+    upstream.run([binary / 'engage.exe', '--probe-menu-font'], env=upstream.clean_env(depsbin))
     licenses(out)
     (out / 'START-HERE.txt').write_text('Engage PC Recomp — experimental setup\n\n'
         '1. Extract this entire ZIP into a folder.\n2. Run Engage-Setup.exe.\n'
@@ -159,7 +166,7 @@ def build(out):
         '4. Optionally add either DLC package and title.keys, then choose a separate install folder.\n'
         '5. Select Install. When it finishes, select Play Engage.\n\n'
         'Requirements: Windows 10/11 x64, AVX2 CPU, Vulkan 1.3 GPU/driver, 40 GiB free.\n'
-        'Setup builds the game locally. No game files or keys are included.\n'
+        'Setup builds engage_game.dll locally and uses the included public runtime. No game files or keys are included.\n'
         'First install may take 20–60 minutes. Shaders cache during play.\n'
         'Keep your original dumps. Saves/settings are in your chosen install folder.\n'
         'Help: https://gitlab.com/engage-pc-recomp/engage-pc-recomp\n', encoding='utf-8')
@@ -176,10 +183,12 @@ def build(out):
         if not cache.resolve().is_relative_to(out):
             raise ValueError('Unexpected cache link outside setup')
         shutil.rmtree(cache)
-    forbidden = {'engage.exe', 'engage-install.json', 'config.local.toml', 'account.uid', 'engage.ini'}
+    forbidden = {'engage.exe', 'engage_game.dll', 'engage-install.json', 'config.local.toml', 'account.uid', 'engage.ini'}
     for file in out.rglob('*'):
         compiler_object = file.suffix.lower() == '.o' and file.is_relative_to(out / 'llvm')
-        if file.name.lower() in forbidden or file.suffix.lower() in ('.log', '.pdb', '.obj', '.o') and not compiler_object:
+        public_runtime = file == binary / 'engage.exe'
+        if file.name.lower() in forbidden and not public_runtime or \
+                file.suffix.lower() in ('.log', '.pdb', '.obj', '.o') and not compiler_object:
             raise ValueError(f'Private build artifact in setup: {file.relative_to(out)}')
     upstream.check_folder(out)
     inventory = []

@@ -2,9 +2,9 @@
 
 ## What goes in a release
 
-Ship the setup tools and source, not a built copy of the game. Setup extracts and compiles the player's own files on their PC. The game icon and shared fonts are taken from their inputs during setup.
+Ship the public runtime, setup tools and source. Setup extracts and compiles the player's own files into `engage_game.dll` on their PC. Shared fonts are taken from their inputs; the public runtime uses an original icon.
 
-Never upload a local install folder, `engage.exe`, game dumps, keys, firmware, saves, generated game code, extracted artwork or shader caches. Keep the upstream licenses and credits with the tools.
+Never upload a local install folder, `engage_game.dll`, an older monolithic `engage.exe`, game dumps, keys, firmware, saves, generated game code, extracted artwork or shader caches. The `bin/engage.exe` built without game inputs by the release builder is the public runtime and may ship with its `engage.json` contract/hash file. Keep the upstream licenses and credits with the tools.
 
 For source archives:
 

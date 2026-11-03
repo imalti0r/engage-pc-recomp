@@ -24,7 +24,14 @@
 #include "cfg.h"
 #include "fs.h"
 #include "host.h"
+#ifdef RT_GAME_LIBRARY
+#define ROMFS_IMAGE_SIZE (rt_game_library()->romfs_size)
+#define ROMFS_IMAGE_SHA256 (rt_game_library()->romfs_sha256)
+#define ROMFS_INDEX_SHA256 (rt_game_library()->index_sha256)
+#define ROMFS_FILE_COUNT (rt_game_library()->romfs_files)
+#else
 #include "romfs_config.h"
+#endif
 #include "romfs_path.h"
 #include "platform/platform.h"
 #include "sha256.h"
@@ -125,7 +132,7 @@ static void verify_image(const char *dir) {
     if (pdir && *pdir) dir = pdir;
     RomfsProof want = {0}, saved;
     memcpy(want.magic, "TOTKRFS-PROOF-1", 16);
-    memcpy(want.sha256, ROMFS_IMAGE_SHA256, sizeof ROMFS_IMAGE_SHA256 < 65 ? sizeof ROMFS_IMAGE_SHA256 : 65);
+    snprintf(want.sha256, sizeof want.sha256, "%s", ROMFS_IMAGE_SHA256);
     want.id = identity_of(image);
     char path[2100];
     need(snprintf(path, sizeof path, "%s/.romfs-verified-v1", dir) < (int)sizeof path, "proof path");
@@ -493,6 +500,7 @@ static void init_once(void *param) {
 #ifdef ROMFS_MISSING
     rt_fatal("this build has no RomFS: tools/build_game.py found no index.json in its --romfs directory");
 #else
+    if (!ROMFS_IMAGE_SIZE || !ROMFS_FILE_COUNT) rt_fatal("game DLL has no verified RomFS metadata; run setup again");
     double t0 = now_s();
     load_index();
     const char *dir = rt_config()->romfs;
