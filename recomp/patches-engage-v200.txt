@@ -5,3 +5,34 @@
 build main 8c08b9719e085f91847b5e0f935d9488
 set fps60 TOTK_FPS60 1
 site fps60 main 032f92d4 2a0003f3 52800033
+
+# Unity ScreenManagerNX: constructor, selected display mode, and resolution change.
+# Each store reads output width/height from patch page +64/+68; keep Unity's
+# allocation and resize notifications. No backend texture scaling.
+set engage_output TOTK_ENGAGE_OUTPUT 0
+site engage_output main 004afd8c b900c269 @page:x16 b9404209 b900c269
+site engage_output main 004afd90 b900c66a @page:x16 b940460a b900c66a
+site engage_output main 004b0044 b900c009 @page:x16 b9404209 b900c009
+site engage_output main 004b004c b900c408 @page:x16 b9404608 b900c408
+site engage_output main 004b0170 b900c269 @page:x16 b9404209 b900c269
+site engage_output main 004b0174 b900c668 @page:x16 b9404608 b900c668
+
+# UniversalRenderPipeline.InitializeStackedCameraData: final cameraData.renderScale.
+# "game" leaves the asset and RenderManager scene overrides untouched. +72 is a float.
+set engage_scene TOTK_ENGAGE_SCENE 0
+site engage_scene main 02cac230 bd00ea60 @page:x16 bd404a00 bd00ea60
+
+# Unity NVN backbuffers: query storage with the selected size before allocating
+# the pool, then use that same size for all three display images and their depth.
+site engage_output main 00a7cff0 52808715 @page:x16 b9404615
+site engage_output main 00a7cff8 5280f001 @page:x16 b9404201
+site engage_output main 00a7d08c 5280f001 @page:x16 b9404201
+site engage_output main 00a7d26c 5280f001 @page:x16 b9404201
+site engage_output main 00a7d270 52808702 @page:x16 b9404602
+site engage_output main 00a7cf48 292607a0 @page:x16 b9404200 b9404601 292607a0
+
+# GraphicsDeviceNVN: default depth buffer and reported device extent must match
+# the display buffers, including the viewport origin used for the final UI pass.
+site engage_output main 00a65e70 52808703 @page:x16 b9404603
+site engage_output main 00a65e7c 5280f002 @page:x16 b9404202
+site engage_output main 00a67090 a9434ff4 @page:x16 b9404208 b9000288 b9404608 b9000268 a9434ff4

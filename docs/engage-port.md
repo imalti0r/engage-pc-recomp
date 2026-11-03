@@ -6,6 +6,9 @@ a full playthrough and longer sessions still need testing.
 The inherited installer, extraction commands, and default build targets still target TotK. Do not feed Engage
 containers to tools/extract.py or use TotK's patch files on Engage.
 
+Engage-specific [resolution and 3D render-scale controls](engage-resolution.md)
+have separate output/scene settings, require a restart and use the Engage patch table.
+
 ## Reproducible starting points
 
 - TotK Recomp: https://github.com/valentderah/totk-pc-recomp at

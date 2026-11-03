@@ -24,7 +24,7 @@ class FrameRateTest(unittest.TestCase):
     def test_build_and_instruction_guards(self):
         table = self.table()
         mod = SimpleNamespace(base=0, nso=SimpleNamespace(build_id=table.builds['main']),
-                              in_text=lambda a: True, word=lambda a: 0x2a0003f3)
+                              in_text=lambda a: True, word=lambda a: table.sites['main'][a][2])
         patches.check(table, mod, 'main')
         mod.nso.build_id = '00' * 32
         with self.assertRaisesRegex(patches.PatchError, 'build ID'):

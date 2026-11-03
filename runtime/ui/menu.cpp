@@ -492,20 +492,25 @@ static void row_output_res(void) {
         snprintf(shown[i], sizeof shown[i], "%d × %d", w, h);   // U+00D7, the multiplication sign
         names[i] = shown[i];
     }
-    opt_choice_list("TOTK_OUTPUT_RES", UI_MENU_OUTPUT_RES, vals, names, N, UI_MENU_OUTPUT_RES_DESC);
+    opt_choice_list("TOTK_OUTPUT_RES", UI_MENU_OUTPUT_RES, vals, names, rt_game_id == 1 ? 4 : N,
+                    rt_game_id == 1 ? UI_MENU_ENGAGE_OUTPUT_DESC : UI_MENU_OUTPUT_RES_DESC);
 }
 
 static void row_render_scale(void) {
-    static const char *const vals[] = {"game", "50", "67", "75", "100", "125", "150", "200"};
-    enum { N = sizeof vals / sizeof *vals };
+    static const char *const totk[] = {"game", "50", "67", "75", "100", "125", "150", "200"};
+    static const char *const engage[] = {"game", "50", "75", "100", "150"};
+    const char *const *vals = rt_game_id == 1 ? engage : totk;
+    enum { N = sizeof totk / sizeof *totk };
+    int count = rt_game_id == 1 ? sizeof engage / sizeof *engage : N;
     char shown[N][32];
     const char *names[N];
-    names[0] = menu_text(UI_MENU_RENDER_SCALE_GAME);
-    for (int i = 1; i < N; i++) {
+    names[0] = menu_text(rt_game_id == 1 ? UI_MENU_ENGAGE_SCALE_GAME : UI_MENU_RENDER_SCALE_GAME);
+    for (int i = 1; i < count; i++) {
         snprintf(shown[i], sizeof shown[i], "%s %%", vals[i]);
         names[i] = shown[i];
     }
-    opt_choice_list("TOTK_RENDER_SCALE", UI_MENU_RENDER_SCALE, vals, names, N, UI_MENU_RENDER_SCALE_DESC);
+    opt_choice_list("TOTK_RENDER_SCALE", UI_MENU_RENDER_SCALE, vals, names, count,
+                    rt_game_id == 1 ? UI_MENU_ENGAGE_SCALE_DESC : UI_MENU_RENDER_SCALE_DESC);
 }
 
 static void row_gpu(void) {
@@ -633,10 +638,8 @@ static void tab_screen(float scale) {
     static const UiTextId perf[] = {UI_MENU_PERF_OFF, UI_MENU_PERF_FPS, UI_MENU_PERF_FULL};
     opt_choice("TOTK_PERF_OVERLAY", UI_MENU_PERF_OVERLAY, perf, 3, UI_MENU_PERF_OVERLAY_DESC);
     opt_group(UI_MENU_GRAPHICS);
-    if (rt_game_id != 1) {
-        row_output_res();
-        row_render_scale();
-    }
+    row_output_res();
+    row_render_scale();
     static const UiTextId up[] = {UI_MENU_UPSCALER_FSR, UI_MENU_UPSCALER_BILINEAR};
     opt_choice("TOTK_UPSCALER", UI_MENU_UPSCALER, up, 2, UI_MENU_UPSCALER_DESC);
     opt_slider("TOTK_SHARPNESS", UI_MENU_SHARPNESS, 0, 100, UI_MENU_SHARPNESS_DESC, 5, "%.0f %%");
