@@ -88,6 +88,8 @@ static const char *const text_en[UI_TEXT_COUNT] = {
     [UI_MENU_COLOR_GAMMA_DESC] = "Below 1 brightens dark and middle tones, above 1 darkens them; 1 leaves them.",
 
     [UI_MENU_FPS_LIMIT] = "Frame rate limit",
+    [UI_MENU_ENGAGE_FPS_DESC] = "Choose original 30 FPS timing or 60 FPS. Restart the game to apply. Rates above 60 are not supported.",
+    [UI_MENU_ENGAGE_PAD_DESC] = "Nintendo: A is the right button. Xbox: A is the bottom button. Automatic follows the controller type. In-game button images remain Nintendo labels.",
     [UI_MENU_FPS_LIMIT_DESC] = "The most frames per second the game draws. Above 60 is experimental and needs Game speed "
                                "follows the clock.",
     [UI_MENU_FPS_30] = "30 FPS", [UI_MENU_FPS_40] = "40 FPS", [UI_MENU_FPS_45] = "45 FPS",
@@ -349,6 +351,8 @@ static const char *const text_ru[UI_TEXT_COUNT] = {
     [UI_MENU_COLOR_GAMMA_DESC] = "Ниже 1 осветляет тёмные и средние тона, выше 1 затемняет их; 1 — без изменений.",
 
     [UI_MENU_FPS_LIMIT] = "Ограничение частоты кадров",
+    [UI_MENU_ENGAGE_FPS_DESC] = "Исходный режим 30 FPS или 60 FPS. Перезапустите игру для применения. Частота выше 60 FPS не поддерживается.",
+    [UI_MENU_ENGAGE_PAD_DESC] = "Nintendo: A справа. Xbox: A снизу. Автоматически — по типу контроллера. Значки кнопок в игре остаются Nintendo.",
     [UI_MENU_FPS_LIMIT_DESC] = "Наибольшее число кадров в секунду. Выше 60 — экспериментальный режим, нужна «Скорость "
                                "игры по часам».",
     [UI_MENU_FPS_30] = "30 FPS", [UI_MENU_FPS_40] = "40 FPS", [UI_MENU_FPS_45] = "45 FPS",

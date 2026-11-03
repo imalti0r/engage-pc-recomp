@@ -1,9 +1,10 @@
 """Code patch table for the generator: guest instructions replaced in the lifted C, switchable at run time.
 
 Lifted code cannot be byte-patched when the game runs, so a patch is applied when the C is generated. A patch file
-(gen.py --patches) has two kinds of lines; `#` starts a comment, fields are separated by whitespace:
+(gen.py --patches) accepts these lines; `#` starts a comment, fields are separated by whitespace:
 
   set  <name> <env> <default>               a patch set: a run-time switch <env>=0/1, <default> when it is unset
+  build <module> <build-id-prefix>          optional NSO build guard, checked before instruction words
   site <set> <module> <address> <original> <replacement> [<replacement> ...]
 
   spin <module> <head> <back-edge> [<back-edge> ...]
@@ -48,11 +49,12 @@ def adrp(pc, target, rd):
 class Table:
     """sets: [(name, env, default)]; sites: {module: {offset: (set index, [word | ('page', reg)], original)}}; page."""
 
-    def __init__(self, sets=(), sites=None, page=0, spins=None):
+    def __init__(self, sets=(), sites=None, page=0, spins=None, builds=None):
         self.sets = list(sets)
         self.sites = sites or {}
         self.page = page
         self.spins = spins or {}   # {module: {back-edge offset: head offset}}
+        self.builds = builds or {}
 
     def spins_for(self, name, base):
         """{absolute back-edge address: absolute head address}."""
@@ -69,14 +71,21 @@ class Table:
 
 def load(path, mods):
     """Table from a patch file; mods is layout() output [(name, base, size)]."""
-    sets, index, sites, spins = [], {}, {}, {}
+    sets, index, sites, spins, builds = [], {}, {}, {}, {}
     bases = {n: (b, s) for n, b, s in mods}
     for no, raw in enumerate(Path(path).read_text().splitlines(), 1):
         f = raw.split('#', 1)[0].split()
         if not f:
             continue
         where = f'{path}:{no}'
-        if f[0] == 'set' and len(f) == 4:
+        if f[0] == 'build' and len(f) == 3:
+            if f[1] not in bases or f[1] in builds:
+                raise PatchError(f'{where}: unknown or repeated build module {f[1]}')
+            prefix = f[2].lower()
+            if not 32 <= len(prefix) <= 64 or len(prefix) % 2 or any(c not in '0123456789abcdef' for c in prefix):
+                raise PatchError(f'{where}: expected a 16..32 byte build ID prefix')
+            builds[f[1]] = prefix
+        elif f[0] == 'set' and len(f) == 4:
             if f[1] in index:
                 raise PatchError(f'{where}: set {f[1]} defined twice')
             index[f[1]] = len(sets)
@@ -113,11 +122,13 @@ def load(path, mods):
     nxt = min((b for _, b, _ in mods if b > base), default=None)
     if nxt is not None and page + PAGE > nxt:
         raise PatchError(f'no room for the patch page after main ({page:#x})')
-    return Table(sets, sites, page, spins)
+    return Table(sets, sites, page, spins, builds)
 
 
 def check(table, mod, name):
     """Stops on a site whose original word differs from the module's."""
+    if name in table.builds and not mod.nso.build_id.startswith(table.builds[name]):
+        raise PatchError(f'{name}: build ID does not match the patch table')
     for off, (_, _, want) in table.sites.get(name, {}).items():
         a = mod.base + off
         if not mod.in_text(a):

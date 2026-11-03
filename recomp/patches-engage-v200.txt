@@ -1,0 +1,7 @@
+# Engage 2.0.0 only. Behavior documented by nxnative at
+# 97f1514a46858b5f48c648022c081b536fbc6ad5, dm/games/0100A6301214E000/README.md, Frame rate.
+# QualitySettings.set_vSyncCount must store 1 as well as request interval 1:
+# GameTime.VsyncFixedCount readers then advance one 60 Hz tick per frame.
+build main 8c08b9719e085f91847b5e0f935d9488
+set fps60 TOTK_FPS60 1
+site fps60 main 032f92d4 2a0003f3 52800033
