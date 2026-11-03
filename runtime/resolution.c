@@ -194,7 +194,44 @@ void res_heapdef_served(void) { R.heapdef_ok = 1; }
 // ---- start: the patch page and the sets
 static uint64_t pack(unsigned w, unsigned h) { return (uint64_t)h << 32 | w; }
 
+static void engage_init(void) {
+    unsigned w = BASE_W, h = BASE_H;
+    const char *o = cfg_value("TOTK_OUTPUT_RES"), *s = cfg_value("TOTK_RENDER_SCALE");
+    char tail;
+    unsigned ow, oh;
+    if (sscanf(o, "%ux%u%c", &ow, &oh, &tail) == 2 &&
+        ((ow == 1280 && oh == 720) || (ow == 1600 && oh == 900) ||
+         (ow == 1920 && oh == 1080) || (ow == 2560 && oh == 1440))) {
+        w = ow, h = oh;
+    } else rt_log("resolution: Engage does not support %s; using 1920x1080", o);
+    float scale = 1;
+    int fixed = strcmp(s, "game") != 0;
+    if (fixed) {
+        char *end;
+        double pct = strtod(s, &end);
+        if (end != s && !*end && pct >= 50 && pct <= 150) scale = (float)(pct / 100);
+        else {
+            fixed = 0;
+            rt_log("resolution: Engage render scale %s is outside 50..150; using game", s);
+        }
+    }
+    int output = rt_patch_set("engage_output"), scene = rt_patch_set("engage_scene");
+    if (output < 0 || scene < 0) {
+        rt_log("resolution: regenerate Engage C with its resolution patch sets to apply these settings");
+        return;
+    }
+    uint8_t *page = rt_patch_page();
+    memcpy(page + 64, &w, 4);
+    memcpy(page + 68, &h, 4);
+    memcpy(page + 72, &scale, 4);
+    rt_patch_switch(output, w != BASE_W || h != BASE_H);
+    rt_patch_switch(scene, fixed);
+    rt_log("resolution: Engage output %ux%u, 3D scale %s%s; restart required", w, h, s,
+           fixed ? "%" : " (game controlled)");
+}
+
 void res_init(void) {
+    if (RT_ENGAGE) { engage_init(); return; }
     if (!bigger()) {
         rt_log("resolution: the game's own (output 1920x1080, scene 1600x900)");
         return;
