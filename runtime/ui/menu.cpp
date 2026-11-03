@@ -196,7 +196,7 @@ static float menu_scale(uint32_t h) {
     return ((float)h >= least ? (float)h : least) / 1080.0f;
 }
 
-// SavageWindRecomp's colours: dark green panels, gold accents.
+// TotK keeps SavageWindRecomp's green; Engage follows its navy dialogue panels and gold trim.
 static void style_init(ImGuiStyle &s) {
     ImGui::StyleColorsDark(&s);
     s.WindowRounding = 14; s.FrameRounding = 8; s.GrabRounding = 8; s.TabRounding = 8; s.ChildRounding = 10;
@@ -217,6 +217,35 @@ static void style_init(ImGuiStyle &s) {
     c[ImGuiCol_TabSelectedOverline] = gold;
     c[ImGuiCol_NavCursor] = gold;
     c[ImGuiCol_Separator] = ImVec4(0.30f, 0.36f, 0.30f, 1);
+    if (rt_game_id == 1) {
+        ImVec4 navy(0.08f, 0.14f, 0.24f, 1), blue(0.16f, 0.27f, 0.41f, 1);
+        ImVec4 hover(0.22f, 0.35f, 0.50f, 1), active(0.25f, 0.38f, 0.54f, 1);
+        c[ImGuiCol_WindowBg] = ImVec4(0.035f, 0.075f, 0.16f, 0.98f);
+        c[ImGuiCol_PopupBg] = ImVec4(0.055f, 0.105f, 0.205f, 1);
+        c[ImGuiCol_TextDisabled] = ImVec4(0.66f, 0.70f, 0.76f, 1);
+        c[ImGuiCol_Button] = blue;
+        c[ImGuiCol_ButtonHovered] = hover;
+        c[ImGuiCol_ButtonActive] = active;
+        c[ImGuiCol_Tab] = navy;
+        c[ImGuiCol_TabHovered] = hover;
+        c[ImGuiCol_TabSelected] = blue;
+        c[ImGuiCol_FrameBg] = navy;
+        c[ImGuiCol_FrameBgHovered] = blue;
+        c[ImGuiCol_FrameBgActive] = hover;
+        c[ImGuiCol_Header] = blue;
+        c[ImGuiCol_HeaderHovered] = hover;
+        c[ImGuiCol_HeaderActive] = active;
+        c[ImGuiCol_SliderGrab] = gold;
+        c[ImGuiCol_SliderGrabActive] = ImVec4(1, 0.87f, 0.55f, 1);
+        c[ImGuiCol_CheckMark] = gold;
+        c[ImGuiCol_ScrollbarBg] = navy;
+        c[ImGuiCol_ScrollbarGrab] = ImVec4(0.39f, 0.47f, 0.59f, 1);
+        c[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.53f, 0.61f, 0.72f, 1);
+        c[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.68f, 0.74f, 0.83f, 1);
+        c[ImGuiCol_Separator] = ImVec4(0.36f, 0.41f, 0.49f, 1);
+        c[ImGuiCol_Border] = ImVec4(0.70f, 0.64f, 0.47f, 1);
+        s.WindowBorderSize = 1;
+    }
 }
 
 static void make_context(void) {
@@ -492,20 +521,25 @@ static void row_output_res(void) {
         snprintf(shown[i], sizeof shown[i], "%d × %d", w, h);   // U+00D7, the multiplication sign
         names[i] = shown[i];
     }
-    opt_choice_list("TOTK_OUTPUT_RES", UI_MENU_OUTPUT_RES, vals, names, N, UI_MENU_OUTPUT_RES_DESC);
+    opt_choice_list("TOTK_OUTPUT_RES", UI_MENU_OUTPUT_RES, vals, names, rt_game_id == 1 ? 4 : N,
+                    rt_game_id == 1 ? UI_MENU_ENGAGE_OUTPUT_DESC : UI_MENU_OUTPUT_RES_DESC);
 }
 
 static void row_render_scale(void) {
-    static const char *const vals[] = {"game", "50", "67", "75", "100", "125", "150", "200"};
-    enum { N = sizeof vals / sizeof *vals };
+    static const char *const totk[] = {"game", "50", "67", "75", "100", "125", "150", "200"};
+    static const char *const engage[] = {"game", "50", "75", "100", "150"};
+    const char *const *vals = rt_game_id == 1 ? engage : totk;
+    enum { N = sizeof totk / sizeof *totk };
+    int count = rt_game_id == 1 ? sizeof engage / sizeof *engage : N;
     char shown[N][32];
     const char *names[N];
-    names[0] = menu_text(UI_MENU_RENDER_SCALE_GAME);
-    for (int i = 1; i < N; i++) {
+    names[0] = menu_text(rt_game_id == 1 ? UI_MENU_ENGAGE_SCALE_GAME : UI_MENU_RENDER_SCALE_GAME);
+    for (int i = 1; i < count; i++) {
         snprintf(shown[i], sizeof shown[i], "%s %%", vals[i]);
         names[i] = shown[i];
     }
-    opt_choice_list("TOTK_RENDER_SCALE", UI_MENU_RENDER_SCALE, vals, names, N, UI_MENU_RENDER_SCALE_DESC);
+    opt_choice_list("TOTK_RENDER_SCALE", UI_MENU_RENDER_SCALE, vals, names, count,
+                    rt_game_id == 1 ? UI_MENU_ENGAGE_SCALE_DESC : UI_MENU_RENDER_SCALE_DESC);
 }
 
 static void row_gpu(void) {
@@ -633,10 +667,8 @@ static void tab_screen(float scale) {
     static const UiTextId perf[] = {UI_MENU_PERF_OFF, UI_MENU_PERF_FPS, UI_MENU_PERF_FULL};
     opt_choice("TOTK_PERF_OVERLAY", UI_MENU_PERF_OVERLAY, perf, 3, UI_MENU_PERF_OVERLAY_DESC);
     opt_group(UI_MENU_GRAPHICS);
-    if (rt_game_id != 1) {
-        row_output_res();
-        row_render_scale();
-    }
+    row_output_res();
+    row_render_scale();
     static const UiTextId up[] = {UI_MENU_UPSCALER_FSR, UI_MENU_UPSCALER_BILINEAR};
     opt_choice("TOTK_UPSCALER", UI_MENU_UPSCALER, up, 2, UI_MENU_UPSCALER_DESC);
     opt_slider("TOTK_SHARPNESS", UI_MENU_SHARPNESS, 0, 100, UI_MENU_SHARPNESS_DESC, 5, "%.0f %%");

@@ -53,8 +53,9 @@ module's build ID and original instruction before generation. F1's Game tab offe
 unsupported. Presentation VSync controls how frames reach the display; disabling
 it alone does not unlock the game's frame rate. Alpha.3 does not include this patch.
 
-The source build's menu hides inherited controls that currently have no Engage
-implementation: game output resolution, internal render scale, field of view,
+The menu supports Engage-specific [game output resolution and 3D render scale](engage-resolution.md).
+It hides inherited controls that currently have no Engage
+implementation: field of view,
 TotK's real-time/cloth/high-FPS patches, Xbox prompt graphics and the TotK LOD
 guard. Virtual core preemption is also hidden because Engage uses cooperative
 boundaries for GC snapshots. The gyro-aiming control is hidden pending verification

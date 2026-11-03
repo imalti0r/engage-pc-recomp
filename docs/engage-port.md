@@ -6,6 +6,29 @@ a full playthrough and longer sessions still need testing.
 The inherited installer, extraction commands, and default build targets still target TotK. Do not feed Engage
 containers to tools/extract.py or use TotK's patch files on Engage.
 
+Engage-specific [resolution and 3D render-scale controls](engage-resolution.md)
+have separate output/scene settings, require a restart and use the Engage patch table.
+
+## Post-battle exploration movement at 60 FPS
+
+The Chapter 1 Lythos Grasslands exploration save exposed another frame-counted
+path: `HubPlayerController.Tick` and `Persistent` use `HubUtil`'s maximum speed,
+acceleration, deceleration and rotation rate per update. The vsync-count patch
+alone does not scale these values. The guarded `fps60` patch now halves maximum
+speed and rotation rate, and quarters acceleration/deceleration (changes in
+distance per update). At 30 FPS these accessors retain their original code.
+The shared maximum-speed accessor also keeps animation speed normalization
+consistent with the smaller distance moved each frame.
+
+Observed using a private copy of the same exploration save and four 1.5-second
+stick inputs: the original 30 FPS build moved about 4.2 game units/second; the
+original 60 FPS build reached 8.4; the corrected 60 FPS build moved about 4.2.
+Corrected travel distances matched the 30 FPS runs within 0.6%. The synthetic
+instruction tests cover speed, acceleration and turning in both modes; the
+27 Engage tests and the runtime self-test pass. This check does not establish
+combat movement timing or full-game correctness. Earlier prologue checks did
+not cover post-battle free walking.
+
 ## Reproducible starting points
 
 - TotK Recomp: https://github.com/valentderah/totk-pc-recomp at

@@ -5,7 +5,7 @@ A native Windows port of **Fire Emblem Engage 2.0.0**, built on [TotK Recomp](ht
 [![Source checks](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/badges/main/pipeline.svg)](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/pipelines)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-[Download Windows Setup](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.4/downloads/Engage-Setup-0.1.0-alpha.4-windows.zip) · [Setup guide](docs/installing-engage.md) · [Report a bug](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/issues/new) · [Build from source](docs/building-engage.md)
+[Download Windows Setup](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.5/downloads/Engage-Setup-0.1.0-alpha.5-windows.zip) · [Setup guide](docs/installing-engage.md) · [Report a bug](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/issues/new) · [Build from source](docs/building-engage.md)
 
 **This is still an early alpha.** The first battle, attack cutscenes and audio work, but the full game hasn't been tested. Expect bugs, and back up your saves.
 
@@ -32,9 +32,11 @@ If you're not sure which files to pick, the [setup guide](docs/installing-engage
 - The first battle, including attack cutscenes.
 - Audio, keyboard and gamepad input.
 - The F1 settings menu. All six tabs were checked in the repaired build.
+- Game output resolution and 3D render scale controls, plus corrected exploration movement speed at 60 FPS.
+- Loading an existing Chapter 1 exploration save in an isolated test profile.
 - Both DLC packages are detected and mounted. Their actual content still needs testing.
 
-Save/load, getting past the first battle and longer play sessions still need checking. There are also graphics issues to investigate. Some dark-versus-blue unit panels appear to depend on the unit's Emblem state, so compare the same scene and settings before reporting a color bug.
+Writing a new save and reloading it, later progression and longer play sessions still need checking. There are also graphics issues to investigate. Some dark-versus-blue unit panels appear to depend on the unit's Emblem state, so compare the same scene and settings before reporting a color bug.
 
 Testing so far has been on Windows 11 with an RTX 4060. Other GPUs, clean Windows installs, Linux and Steam Deck haven't been verified. TotK features and patches don't automatically work with Engage.
 

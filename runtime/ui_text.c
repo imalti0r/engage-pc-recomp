@@ -59,6 +59,12 @@ static const char *const text_en[UI_TEXT_COUNT] = {
     [UI_MENU_RENDER_SCALE_DESC] = "Size of the 3D scene relative to the game resolution; the game's FSR scales it to "
                                   "that size. Above 100 % smooths jagged edges (supersampling) at a high GPU cost.",
     [UI_MENU_RENDER_SCALE_GAME] = "Game (83 %)",
+    [UI_MENU_ENGAGE_OUTPUT_DESC] = "The resolution Engage draws its picture and interface in. 16:9 sizes only. "
+                                   "Higher resolutions use more GPU time and memory. Restart required.",
+    [UI_MENU_ENGAGE_SCALE_DESC] = "Size of the 3D scene relative to the game resolution. Game lets Engage choose "
+                                  "the scale for each scene. A percentage overrides that choice. Above 100 % "
+                                  "supersamples at a high GPU cost. Restart required.",
+    [UI_MENU_ENGAGE_SCALE_GAME] = "Game (scene dependent)",
     [UI_MENU_UPSCALER] = "Scaling to the window",
     [UI_MENU_UPSCALER_DESC] = "How the picture is scaled when the window is larger than the game resolution. FSR keeps "
                               "edges and detail sharper than bilinear.",
