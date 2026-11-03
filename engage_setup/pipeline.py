@@ -199,6 +199,7 @@ class Pipeline:
     def lift(self):
         self.reporter.progress('lift', 'work')
         self.python('recomp/gen.py', '--exefs', self.extracted / 'ExeFS', '--out', self.generated,
+                    '--patches', self.paths.root / 'recomp' / 'patches-engage-v200.txt',
                     '--no-callee-saved-trust', '--continuations', '--jobs', min(8, os.cpu_count() or 1))
 
     def compile(self):

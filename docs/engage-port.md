@@ -208,7 +208,7 @@ on 87 functions. Additional samples pass: CPU 1,534 cases; SIMD 512 cases; atomi
 396 cases. These samples do not establish whole-game correctness or gameplay.
 
 ```powershell
-.venv\Scripts\python recomp/gen.py --exefs build/extracted/engage-v200/ExeFS --out generated/engage-v200-cont --continuations --no-callee-saved-trust --jobs 4
+.venv\Scripts\python recomp/gen.py --exefs build/extracted/engage-v200/ExeFS --out generated/engage-v200-cont --patches recomp/patches-engage-v200.txt --continuations --no-callee-saved-trust --jobs 4
 .venv\Scripts\python tools/build_engage.py --gen generated/engage-v200-cont --out build/engage-v200-cont --jobs 12
 .venv\Scripts\python -m unittest discover -s tests -p continuations_test.py
 ```
