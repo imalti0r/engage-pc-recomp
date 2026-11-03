@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from engage_setup.model import Form, TITLE, installed_state
 from engage_setup.pipeline import Pipeline, redact, remove_work, validate_destination, write_json
 from installer.events import Reporter
+from installer.guilogic import STEP_ORDER
 
 
 class SetupTest(unittest.TestCase):
@@ -30,6 +31,15 @@ class SetupTest(unittest.TestCase):
             self.assertIn('ui.missing_dlc1', form.problems())
             form.firmware = ''
             self.assertIn('ui.need_firmware', form.problems())
+
+    def test_finished_install_needs_no_input_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            form = Form(dest=temp, lang='en-US')
+            self.assertIn('ui.need_base', form.problems())
+            write_json(Path(temp) / 'engage-install.json', {'format': 1, 'title_id': TITLE, 'done': ['extract']})
+            self.assertIn('ui.need_base', form.problems())
+            write_json(Path(temp) / 'engage-install.json', {'format': 1, 'title_id': TITLE, 'done': list(STEP_ORDER[1:])})
+            self.assertEqual(form.problems(), [])
 
     def test_reject_foreign_folder_and_input_overlap(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -110,6 +120,35 @@ class SetupTest(unittest.TestCase):
             self.assertEqual(save.read_bytes(), b'keep')
             self.assertTrue((root / 'engage.exe').exists())
             self.assertTrue((root / 'romfs-index.bin').exists())
+
+    def test_new_release_reruns_only_lift_compile_and_prepare(self):
+        with tempfile.TemporaryDirectory() as temp:
+            dest = Path(temp) / 'game'
+            (dest / 'exefs').mkdir(parents=True)
+            (dest / 'exefs/main').touch()
+            write_json(dest / 'engage-install.json', {'format': 1, 'title_id': TITLE, 'release': 'old',
+                'inputs': 'moved-files', 'done': list(STEP_ORDER[1:]), 'assets': ['romfs', 'exefs']})
+            pipeline = Pipeline(Form(dest=str(dest)), SimpleNamespace(release='new', root=Path(temp)), Reporter(out=io.StringIO()))
+            (Path(temp) / 'recomp').mkdir()
+            (Path(temp) / 'recomp/patches-engage-v200.txt').touch()
+            pipeline.check = lambda: None
+            pipeline.fingerprint = lambda: 'other-files'
+            pipeline.validate_resume = lambda: None
+            ran = []
+            for step in STEP_ORDER[1:]:
+                setattr(pipeline, step, lambda step=step: ran.append(step))
+            pipeline.run()
+            self.assertEqual(ran, ['lift', 'compile', 'prepare', 'cleanup'])
+            ran.clear()
+            pipeline.paths = SimpleNamespace(release='newer', root=Path(temp))
+            (pipeline.generated).mkdir(parents=True)
+            (pipeline.generated / 'layout.json').touch()
+            pipeline.state['lift_key'] = pipeline.lift_key()
+            write_json(dest / 'engage-install.json', pipeline.state)
+            pipeline.run()
+            self.assertEqual(ran, ['compile', 'prepare', 'cleanup'])
+            self.assertEqual(installed_state(dest)['release'], 'newer')
+            self.assertTrue((pipeline.extracted / 'ExeFS/main').exists())
 
     def test_cancelled_step_is_not_checkpointed(self):
         with tempfile.TemporaryDirectory() as temp:

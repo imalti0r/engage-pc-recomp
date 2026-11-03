@@ -196,15 +196,29 @@ class Pipeline:
         finally:
             config.unlink(missing_ok=True)
 
+    def lift_key(self):
+        # Everything the generated C depends on: the lifter's sources, the patch file and the game's modules.
+        root = self.paths.root
+        digest = hashlib.sha256()
+        files = sorted((root / 'recomp').rglob('*.py')) + [root / 'recomp' / 'patches-engage-v200.txt']
+        files += sorted(p for p in (self.extracted / 'ExeFS').iterdir() if p.is_file())
+        for path in files:
+            digest.update(path.name.encode() + b"|" + path.read_bytes())
+        return digest.hexdigest()
+
     def lift(self):
         self.reporter.progress('lift', 'work')
         self.python('recomp/gen.py', '--exefs', self.extracted / 'ExeFS', '--out', self.generated,
                     '--patches', self.paths.root / 'recomp' / 'patches-engage-v200.txt',
                     '--no-callee-saved-trust', '--continuations', '--jobs', min(8, os.cpu_count() or 1))
+        self.state['lift_key'] = self.lift_key()
+
+    def deployed_or(self, work_path, name):
+        return self.dest / name if 'romfs' in self.state.get('assets', []) and not work_path.is_dir() else work_path
 
     def compile(self):
         self.python('tools/build_engage.py', '--extracted', self.extracted, '--translator', self.paths.xlate.parent,
-                    '--gen', self.generated, '--out', self.build, '--romfs', self.extracted / 'packed-romfs',
+                    '--gen', self.generated, '--out', self.build, '--romfs', self.deployed_or(self.extracted / 'packed-romfs', 'romfs'),
                     '--profile', self.dest / 'profile', '--toolchain', self.paths.llvm, '--deps', self.paths.deps,
                     '--ninja', self.paths.ninja, '--runtime', self.paths.runtime, '--jobs', min(8, os.cpu_count() or 1))
 
@@ -248,7 +262,8 @@ class Pipeline:
             raise ValueError('Close Engage before replacing the game executable, then retry setup.') from None
 
     def cleanup(self):
-        for path in (self.generated, self.build / 'obj', self.extracted / 'RomFS'):
+        # generated/ stays so an update can skip the lift (see lift_key).
+        for path in (self.build / 'obj', self.extracted / 'RomFS'):
             remove_work(path, self.work)
 
     def run(self):
@@ -261,7 +276,14 @@ class Pipeline:
         with lock_destination(self.dest):
             old = installed_state(self.dest)
             stamp = self.fingerprint()
-            if old and (old.get('inputs') != stamp or old.get('release') != self.paths.release):
+            if old and old.get('release') != self.paths.release and old.get('done') == list(STEP_ORDER[1:]):
+                # Update: the game data is already extracted and deployed, so only lift, compile and prepare rerun.
+                self.reuse_exefs()
+                # The generated C is kept after an install; it is reused when nothing that feeds the lifter changed.
+                cached = old.get('lift_key') == self.lift_key() and (self.generated / 'layout.json').is_file()
+                old.update(release=self.paths.release, done=['extract', 'lift'][:2 if cached else 1],
+                           updated_from=old.get('release'))
+            if old and old.get('updated_from') is None and (old.get('inputs') != stamp or old.get('release') != self.paths.release):
                 raise ValueError('Inputs or setup version changed. Choose a fresh install folder; keep your existing profile.')
             self.state = old or {'format': 1, 'title_id': TITLE, 'release': self.paths.release,
                                 'lang': self.form.lang, 'inputs': stamp, 'done': []}
@@ -281,6 +303,11 @@ class Pipeline:
                 write_json(self.dest / 'engage-install.json', self.state)
                 self.reporter.step(step, 'done')
         self.reporter.emit('end', result='ok', seconds=self.reporter.elapsed())
+
+    def reuse_exefs(self):
+        # Cleanup keeps extracted/ExeFS, but restore it from the deployed copy if it is gone.
+        if not (self.extracted / 'ExeFS').is_dir():
+            shutil.copytree(self.dest / 'exefs', self.extracted / 'ExeFS')
 
     def validate_resume(self):
         done = self.state.get('done')
