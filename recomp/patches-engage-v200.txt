@@ -6,6 +6,15 @@ build main 8c08b9719e085f91847b5e0f935d9488
 set fps60 TOTK_FPS60 1
 site fps60 main 032f92d4 2a0003f3 52800033
 
+# HubPlayerController.Tick/Persistent use HubUtil's speed, acceleration and turn
+# rate as distances per update. At 60 Hz halve speed/turn rate and quarter the
+# change in per-update speed, preserving world speed and acceleration at 30 Hz.
+# Keep the shared max-speed getter consistent for animation speed normalization.
+site fps60 main 02a5e870 bd402000 bd402000 1e2c1001 1e210800
+site fps60 main 02a5e8d0 bd402400 bd402400 1e2a1001 1e210800
+site fps60 main 02a5e930 bd402800 bd402800 1e2a1001 1e210800
+site fps60 main 02a5e990 bd402c00 bd402c00 1e2c1001 1e210800
+
 # Unity ScreenManagerNX: constructor, selected display mode, and resolution change.
 # Each store reads output width/height from patch page +64/+68; keep Unity's
 # allocation and resize notifications. No backend texture scaling.

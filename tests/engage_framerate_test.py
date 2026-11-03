@@ -114,6 +114,30 @@ int main(int argc,char **argv) {
                 with self.subTest(value=value, legacy=legacy):
                     subprocess.run([str(exe), value, legacy, str(expected)], check=True, capture_output=True)
 
+    def test_exploration_speed_acceleration_and_turn_rate(self):
+        import unicorn as uc
+        from unicorn import arm64_const as a
+        # Speeds are distances per update; acceleration changes that distance per update.
+        for site, offset, scale, frame_power in [(0x2a5e870, 0x20, .5, 1),
+                (0x2a5e8d0, 0x24, .25, 2), (0x2a5e930, 0x28, .25, 2),
+                (0x2a5e990, 0x2c, .5, 1)]:
+            patch_set, words, original = self.table().sites['main'][site]
+            self.assertEqual(self.table().sets[patch_set][0], 'fps60')
+            for value in (0.0, 0.14, 1.0, 2.5):
+                for hz, code in [(30, [original]), (60, words)]:
+                    with self.subTest(site=hex(site), value=value, hz=hz):
+                        mu = uc.Uc(uc.UC_ARCH_ARM64, uc.UC_MODE_ARM)
+                        mu.mem_map(0x1000, 0x2000)
+                        mu.mem_write(0x2000 + offset, struct.pack('<f', value))
+                        mu.mem_write(0x1000, struct.pack('<' + 'I' * len(code), *code))
+                        mu.reg_write(a.UC_ARM64_REG_X0, 0x2000)
+                        mu.emu_start(0x1000, 0x1000 + 4 * len(code))
+                        result = struct.unpack('<f', struct.pack('<I', mu.reg_read(a.UC_ARM64_REG_S0)))[0]
+                        self.assertAlmostEqual(result, value * (scale if hz == 60 else 1), places=6)
+                        self.assertAlmostEqual(result * hz ** frame_power,
+                                               value * 30 ** frame_power, places=3)
+                        self.assertEqual(mu.reg_read(a.UC_ARM64_REG_X0), 0x2000)
+
 
 if __name__ == '__main__':
     unittest.main()
