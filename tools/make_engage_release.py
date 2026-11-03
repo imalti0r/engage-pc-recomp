@@ -73,7 +73,7 @@ def copy_sources(out):
             continue
         source = ROOT / relative
         if source.suffix.lower() not in {'.py', '.c', '.cc', '.cpp', '.h', '.hpp', '.json', '.ps1', '.txt',
-                                        '.manifest', '.inl', '.glsl', '.comp', '.spv', '.inc'}:
+                                        '.manifest', '.inl', '.glsl', '.comp', '.spv', '.inc'} and relative.as_posix() != 'runtime/ui/fonts/Roboto-Medium.ttf':
             continue
         target = out / relative
         target.parent.mkdir(parents=True, exist_ok=True)

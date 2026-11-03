@@ -210,6 +210,7 @@ class Pipeline:
     def prepare(self):
         self.reporter.progress('prepare', 'work')
         self.command([self.build / 'engage.exe', '--selftest'], timeout=60)
+        self.command([self.build / 'engage.exe', '--probe-menu-font'], timeout=60)
         self.command([self.build / 'engage.exe', '--probe-audout'], timeout=60)
         for source, target in ((self.extracted / 'packed-romfs', self.dest / 'romfs'),
                                (self.extracted / 'ExeFS', self.dest / 'exefs'),
