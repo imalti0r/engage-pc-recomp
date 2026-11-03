@@ -49,6 +49,7 @@ static void *page;
 
 void rt_patches_init(void) {
 #if RT_PATCH_COUNT
+    if (!PATCH_COUNT) return;   // A DLL generated without patches has no patch page to commit.
     if (!plat_mem_commit(RT_PATCH_PAGE, 0x1000))
         rt_fatal("patches: cannot commit the patch page at %#llx", RT_PATCH_PAGE);
     page = (void *)(uintptr_t)RT_PATCH_PAGE;
