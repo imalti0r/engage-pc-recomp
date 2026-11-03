@@ -29,6 +29,14 @@ Use the issue form. Include the port version and game update from the title line
 
 ## Pull requests
 
+Our development workflow is **issue → `dev` → pull request → `main` → release**.
+Record the reproduction, diagnosis and test results in an issue. Start work on
+`dev` synchronized with `main`, and open a PR from `dev` into `main` that links
+the issue (`Fixes #number` when it resolves the report). Merge only after the
+relevant local tests and GitHub checks pass. Keep `dev` after merging and
+fast-forward it to `main` before the next change. Build public release assets
+from the reviewed, tagged source; game-dependent test files stay local.
+
 - One topic per pull request.
 - Describe the problem, then what changed.
 - Say how you tested it: which version, which scene, how long.

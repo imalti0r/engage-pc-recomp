@@ -27,6 +27,7 @@
 #include "fs.h"
 #include "host.h"
 #include "platform/platform.h"
+#include "ui/menu.h"
 #include "sha256.h"
 
 #define MAX_MODULES 16
@@ -431,7 +432,7 @@ static int selftest(void) {
 
 static int usage(const char *argv0) {
     fprintf(stderr, "usage: %s [--exefs DIR] [--romfs DIR] [--profile DIR] [--selftest | --probe-loader | "
-                    "--probe-engage-input | --probe-audout | --probe-cfg | --probe-dpi | --probe-kernel | --probe-ipc | --probe-services | --probe-fs | --probe-gfx-abi | "
+                    "--probe-engage-input | --probe-audout | --probe-menu-font | --probe-cfg | --probe-dpi | --probe-kernel | --probe-ipc | --probe-services | --probe-fs | --probe-gfx-abi | "
                     "--probe-nvn | --probe-nvn-tex | --probe-window | --probe-shader | --probe-vkmem | "
                     "--probe-vkexec | --probe-astc | --probe-movie | --prepare-shaders | --warm-shaders | --boot |--seconds S [--shot PNG]]\n", argv0);
     return 2;
@@ -517,6 +518,11 @@ int main(int argc, char **argv) {
         return 0;
     }
     if (!strcmp(mode, "--selftest")) return selftest();
+    if (!strcmp(mode, "--probe-menu-font")) {
+        int ok = menu_font_check();
+        printf("menu-font: %s\n", ok ? "passed" : "FAILED");
+        return ok ? 0 : 1;
+    }
     if (!strcmp(mode, "--probe-loader")) return probe_loader();
     if (!strcmp(mode, "--probe-cfg")) return probe_cfg();
 #ifdef _WIN32

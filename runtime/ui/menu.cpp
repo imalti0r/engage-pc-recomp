@@ -64,6 +64,8 @@ static const unsigned char roboto_ttf[] = {
 };
 #pragma clang diagnostic pop
 
+static_assert(sizeof roboto_ttf > 100, "Menu font is missing: include runtime/ui/fonts/Roboto-Medium.ttf in setup.");
+
 // ---- open state, any thread
 static std::atomic<int> g_open;     // the menu is open
 static std::atomic<int> g_reset;    // opened or closed since the last laid-out frame: drop stale input
