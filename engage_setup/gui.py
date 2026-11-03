@@ -39,6 +39,13 @@ class App(BaseApp):
     def form(self):
         return Form(**{name: self.vars[name].get() for name in (*FIELDS, 'dest')}, lang=self.selected_lang())
 
+    def refresh_form(self):
+        super().refresh_form()
+        update = self.form().finished()
+        if update:
+            self.update_hint.configure(text=self.cat('ui.update_ready'))
+        self.start_button.configure(text=self.cat('ui.update_start' if update else 'ui.start'))
+
     def pick_file(self, name, pick_id):
         if name == 'firmware':
             path = filedialog.askdirectory(parent=self.root, title='Choose the extracted firmware NCA folder')
