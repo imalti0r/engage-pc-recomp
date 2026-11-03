@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from installer.guilogic import Catalog as BaseCatalog, Form as BaseForm
+from installer.guilogic import Catalog as BaseCatalog, Form as BaseForm, STEP_ORDER
 from installer import ini
 
 TITLE = '0100A6301214E000'
@@ -63,13 +63,16 @@ class Form(BaseForm):
         return installed_state(self.dest) if self.dest.strip() else None
 
     def problems(self):
-        # Inputs remain required on resume: this prevents silently changing the DLC set.
+        # Inputs remain required on resume: this prevents silently changing the DLC set. A finished install
+        # is updated from its own files, so it needs none.
+        state = self.installed_state()
+        finished = state is not None and state.get('done') == list(STEP_ORDER[1:])
         found = []
         if not self.dest.strip():
             found.append('ui.need_dest')
         for name in FIELDS:
             value = getattr(self, name).strip()
-            if not value and name in FIELDS[:4]:
+            if not value and name in FIELDS[:4] and not finished:
                 found.append('ui.need_' + name)
             elif value and not (Path(value).is_dir() if name == 'firmware' else Path(value).is_file()):
                 found.append('ui.missing_' + name)
