@@ -21,7 +21,9 @@ TEXT = {
     'ui.need_firmware': 'Choose an extracted firmware NCA folder.',
     'ui.missing_firmware': 'The firmware folder does not exist.',
     'ui.done_text': 'Engage is installed in {dest}. Select Play Engage to start.\nKeep this setup package if you need to rebuild. Your original dumps are unchanged.',
-    'ui.update_mode': 'This folder contains an Engage installation. Completed work can be resumed.\nUse the same input files when resuming an interrupted install.',
+    'ui.update_mode': 'This folder contains an unfinished Engage installation. Setup will resume it.\nUse the same input files you used before.',
+    'ui.update_ready': 'Update mode: this folder already has Engage installed.\nLeave every file field empty and click Update Engage. Your saves and settings are kept, and the game is not extracted again.',
+    'ui.update_start': 'Update Engage',
     'ui.play': 'Play Engage',
     'ui.start': 'Install Engage',
     'setup.failure': '{message}',
@@ -62,11 +64,14 @@ class Form(BaseForm):
     def installed_state(self):
         return installed_state(self.dest) if self.dest.strip() else None
 
+    def finished(self):
+        state = self.installed_state()
+        return state is not None and state.get('done') == list(STEP_ORDER[1:])
+
     def problems(self):
         # Inputs remain required on resume: this prevents silently changing the DLC set. A finished install
         # is updated from its own files, so it needs none.
-        state = self.installed_state()
-        finished = state is not None and state.get('done') == list(STEP_ORDER[1:])
+        finished = self.finished()
         found = []
         if not self.dest.strip():
             found.append('ui.need_dest')
