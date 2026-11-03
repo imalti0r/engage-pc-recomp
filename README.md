@@ -2,10 +2,10 @@
 
 A native Windows port of **Fire Emblem Engage 2.0.0**, built on [TotK Recomp](https://github.com/valentderah/totk-pc-recomp).
 
-[![Source checks](https://github.com/veneito/engage-pc-recomp/actions/workflows/content-guard.yml/badge.svg)](https://github.com/veneito/engage-pc-recomp/actions/workflows/content-guard.yml)
+[![Source checks](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/badges/main/pipeline.svg)](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/pipelines)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-[Download Windows Setup](https://github.com/veneito/engage-pc-recomp/releases/download/engage-v0.1.0-alpha.4/Engage-Setup-0.1.0-alpha.4-windows.zip) · [Setup guide](docs/installing-engage.md) · [Report a bug](https://github.com/veneito/engage-pc-recomp/issues/new/choose) · [Build from source](docs/building-engage.md)
+[Download Windows Setup](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.4/downloads/Engage-Setup-0.1.0-alpha.4-windows.zip) · [Setup guide](docs/installing-engage.md) · [Report a bug](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/issues/new) · [Build from source](docs/building-engage.md)
 
 **This is still an early alpha.** The first battle, attack cutscenes and audio work, but the full game hasn't been tested. Expect bugs, and back up your saves.
 
@@ -24,7 +24,7 @@ If you're not sure which files to pick, the [setup guide](docs/installing-engage
 
 **Updating:** run the newer setup on your existing install folder. Saves and settings are kept, and game files aren't extracted again.
 
-**Use alpha.3 or newer.** Alpha.2 was missing the menu font, which could crash the game when you pressed F1. That's fixed in [#2](https://github.com/veneito/engage-pc-recomp/pull/2).
+**Use alpha.3 or newer.** Alpha.2 was missing the menu font, which could crash the game when you pressed F1. That's fixed in [#2](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/merge_requests/2).
 
 ## What's working
 
@@ -52,9 +52,9 @@ For a source build, use `Run-Engage.cmd`. Settings are in `engage.ini`, logs are
 
 ## Helping out
 
-If something breaks, [open an issue](https://github.com/veneito/engage-pc-recomp/issues/new/choose). Include your version, GPU/driver, what you were doing and how to reproduce it. Check logs for personal paths before sharing them.
+If something breaks, [open an issue](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/issues/new). Include your version, GPU/driver, what you were doing and how to reproduce it. Check logs for personal paths before sharing them.
 
-Want to contribute? Read [CONTRIBUTING.md](CONTRIBUTING.md). PRs go into **`dev`**. Small maintainer documentation edits don't need a PR.
+Want to contribute? Read [CONTRIBUTING.md](CONTRIBUTING.md). MRs go into **`dev`**. Small maintainer documentation edits don't need a PR.
 
 See our [code of conduct](CODE_OF_CONDUCT.md), [security policy](SECURITY.md) and [accessibility statement](ACCESSIBILITY.md).
 

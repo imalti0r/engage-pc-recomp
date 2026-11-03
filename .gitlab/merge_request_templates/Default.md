@@ -1,5 +1,5 @@
-Open contribution PRs against **`dev`**. Maintainer release PRs go from `dev` to `main`.
-Small documentation or wording edits by maintainers don't need a PR.
+Open contribution MRs against **`dev`**. Maintainer release MRs go from `dev` to `main`.
+Small documentation or wording edits by maintainers don't need a MR.
 
 ## What changed?
 

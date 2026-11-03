@@ -1,0 +1,41 @@
+# Source checks that don't need game files or keys.
+stages: [check, release]
+
+source:
+  stage: check
+  image: python:3.12
+  variables:
+    CC: clang
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq clang
+  script:
+    - python tools/check_content.py
+    - python -m pip install -r tools/requirements-engage-lifter.txt
+    - python -m unittest discover -s tests -p "engage*_test.py"
+    - python tests/extract_engage_test.py
+    - python tests/continuations_test.py
+
+# shortcut: untested on GitLab; needs the shared Windows runners (tags below) and Python 3.14 from Chocolatey, so pin or move to a self-hosted runner if it fails.
+setup-window:
+  stage: check
+  tags: [saas-windows-medium-amd64]
+  before_script:
+    - choco install python --version=3.14.0 -y --no-progress
+    - $env:Path = [Environment]::GetEnvironmentVariable("Path","Machine")
+  script:
+    - python -m unittest discover -s tests -p "engage_setup_test.py"
+    - python -m engage_setup.gui --selftest
+
+audit-source-release:
+  stage: release
+  image: python:3.12
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^engage-v/
+  script:
+    - python tools/check_content.py
+    - python tools/make_engage_source_release.py --ref "$CI_COMMIT_TAG" --out build/source-release
+  artifacts:
+    paths:
+      - build/source-release/*-source.zip
+      - build/source-release/SHA256SUMS
+      - build/source-release/source-inventory.json
