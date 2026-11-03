@@ -1,26 +1,27 @@
-# Engage release policy
+# Making a release
 
-## First public release: source preview
+## What goes in a release
 
-Publish an explicitly marked prerelease from a reviewed source commit. Its assets may contain the source snapshot, license notices and SHA-256 checksums. It is not a playable game or an Engage setup installer. Preserve upstream license notices and attribution. The README must state the experimental status and distinguish observed gameplay from unverified features.
+Ship the setup tools and source, not a built copy of the game. Setup extracts and compiles the player's own files on their PC. The game icon and shared fonts are taken from their inputs during setup.
 
-Before publishing:
+Never upload a local install folder, `engage.exe`, game dumps, keys, firmware, saves, generated game code, extracted artwork or shader caches. Keep the upstream licenses and credits with the tools.
 
-1. Run the content guard on the source tree and staged files.
-2. Run the Engage source tests and synthetic continuation test.
-3. Audit the exact Git revision used to make the source archive with `tools/make_engage_source_release.py`.
-4. Confirm that the archive has no private config, game input, generated code, extracted artwork, keys, firmware, saves, caches, logs or locally built game executable.
-5. Keep the release tag tied to that commit. Upload only the audited archive and its checksum file. Never zip an existing local build or installation directory.
+For source archives:
 
-Source-only GitHub CI intentionally has no game files, keys or firmware. A green source workflow is not a runtime/gameplay certification. Do not upload local gameplay test folders as Actions artifacts.
+1. Run the content guard on the working tree and staged files.
+2. Run the Engage tests and continuation test.
+3. Use `tools/make_engage_source_release.py` to audit and package the exact commit being released.
+4. Check the archive and checksums before uploading. Keep the tag on that commit.
 
-## Windows setup candidate
+GitHub's source checks run without game files or keys. They help catch mistakes, but they don't replace playing the game. Local gameplay folders don't belong in Actions artifacts.
 
-Follow TotK's distribution boundary: ship the host runtime/build tools, then extract, recompile and link on the player's computer using their inputs. A complete `engage.exe` is never a public release asset. The user's game icon and fonts are extracted only during local setup.
+## Building Windows setup
 
-`engage_setup` supplies the Engage-specific pipeline and form, reusing the MIT-licensed upstream window, event model and cancellation controller. `tools/make_engage_release.py` bundles the pinned Python/compiler dependencies and a self-contained .NET extractor. The inherited `python -m installer` command still targets TotK; Engage uses `python -m engage_setup`.
+Engage uses `engage_setup`. The inherited `python -m installer` command is still for TotK.
 
-Build a candidate with Python 3.14:
+`tools/make_engage_release.py` bundles Python, the compiler, runtime source and the self-contained extractor. It also includes the licensed Roboto font used by the settings menu. Keep that font and its license in the package; leaving it out caused the alpha.2 F1 crash.
+
+From a clean, committed checkout, run this with Python 3.14:
 
 ```powershell
 .venv-py314\Scripts\python.exe tools\make_engage_release.py `
@@ -28,24 +29,31 @@ Build a candidate with Python 3.14:
   --zip build\release\Engage-Setup-<version>-windows.zip
 ```
 
-Keep the source revision clean for a public build. Never substitute a development install folder for the setup bundle. The builder inventories the result, scans for game-derived content, tests isolated imports and the missing-input command, and opens/closes the setup window. Its content check does not replace a local full-install test.
+The builder checks the bundled Python, the missing-input error path and the setup window. It scans the package for game content, writes an inventory and makes a checksum file. Check the finished ZIP against that inventory too.
 
-A setup release also needs a clean-machine end-to-end test, cancellation/retry checks, existing-profile preservation, pinned downloads with hash checks, bundled dependency license texts, artifact inventory and checksums. Test the setup's no-game-files failure path in CI. Keep game-dependent verification local and report its scope honestly.
+For a public release, merge the reviewed changes from `dev` into `main`, tag that source, and build from it. Upload the checked assets to a draft release first. Verify the uploaded hashes, then publish it.
 
-The current local test uses bundled tools with a minimal PATH and a fresh install folder on D:. This is a developer-machine test, **not a clean-VM certification**. Before calling the release broadly supported, repeat it on a clean Windows machine and record the hardware/driver, install result, first launch, audio, save/load and post-battle behavior. Initial releases must remain marked prerelease.
+## What to test
 
-Observed locally on Windows 11 with an NVIDIA RTX 4060:
+Try a fresh installation with the bundled tools and no developer tools on PATH. Check cancellation/retry, saves and settings, first launch, audio and the F1 menu. Setup runs `--probe-menu-font` before installing the compiled game, but the menu should also be opened and checked in a real run.
 
-- Base/update identities, Engage 2.0.0 build IDs, both DLC packages and all six fonts verified.
-- Extraction and packing of 206,874 files completed on the second drive; 16,572,416,159-byte RomFS image.
-- Continuation-enabled code generation completed with no unsupported instructions reported.
-- Setup resumed from the completed extraction/generation checkpoints after a packaging-path fix; all 568 compilation objects built, installation and cleanup completed successfully.
-- The installed executable passed its CPU/audio checks and Engage filesystem probe (both DLC mounts, packed index and audio-bank paths).
-- A bounded first boot rendered the opening movie, opened SDL audio, and exited normally. Cold shader/pipeline work caused noticeable first-launch stalls.
-- Candidate setup's isolated Python imports, missing-input error path, GUI selftest and content scan passed. The README screenshot contains only the empty setup form and original setup icon.
+Keep early builds marked as prereleases. Before calling the port broadly supported, test on a clean Windows machine and more hardware. Record what worked, what failed and what hasn't been checked yet.
 
-This does not verify fresh-VM installation, save/load, DLC gameplay, post-battle progression or full-game stability. Keep local logs, screenshots and installed game files out of release assets.
+## Results so far
 
-## Known rendering report
+Local testing has been on Windows 11 with an RTX 4060:
 
-The unit-information panel was reported darker in one screenshot and blue in another. The examples show different states (a unit alone versus paired with Marth). A [normal-state gameplay reference](https://images.igdb.com/igdb/image/upload/t_1080p_2x/sciwxx.webp) also shows a dark panel for Alear without an Emblem partner. This supports a state-dependent UI difference; it does not establish a renderer defect or validate every color. Compare matching unit/state/settings before changing global gamma, blending or shader behavior. No renderer change was made from these screenshots.
+- A fresh install on a second drive completed with both DLCs and all six shared fonts.
+- Extraction and packing covered 206,874 files and a 16,572,416,159-byte RomFS image.
+- Continuation-enabled code generation reported no unsupported instructions.
+- Setup resumed after a packaging-path fix, then finished compiling, installing and cleaning up.
+- The installed CPU/audio checks and Engage filesystem/DLC probe passed.
+- The opening movie rendered in a timed boot test, audio opened, and the game exited normally. First-launch shader work caused pauses.
+- The alpha.3 menu fix passed the font check and rendered all six settings tabs using a separate test profile. Screen and Sound were checked for readable text.
+- The setup window, missing-input check and package content scan passed. The README screenshot shows the empty setup form, with no personal paths or game artwork.
+
+Clean-machine installs, save/load, DLC gameplay, progress after the first battle and full-game stability still need testing. Keep the local test logs and gameplay screenshots out of release assets.
+
+## Color reports
+
+The dark and blue unit-information panels were shown in different Emblem states. A [gameplay reference](https://images.igdb.com/igdb/image/upload/t_1080p_2x/sciwxx.webp) also shows a dark panel for Alear without an Emblem partner. That alone doesn't confirm a rendering bug. Compare the same unit, state and settings before changing gamma, blending or shaders. No renderer change was made for this report.

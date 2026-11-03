@@ -1,58 +1,52 @@
 # Contributing
 
-## The one hard rule
+## Keep game files out of the repo
 
-Nothing that came out of the game goes into the repository: no game files, keys, extracted data, recompiled C, compiled binaries, shaders, shader caches, fonts, audio or movies. Not in commits, not in issues, not in pull requests. Only information about the game goes in: addresses, hashes, patch code we wrote, shader and bind-state identifiers.
+Don't upload game files, keys, firmware, saves, extracted assets, generated game code or built game executables. That includes issues and PRs. Technical notes, hashes, addresses and code written for the port are fine.
 
-Two checks enforce this:
+The content check runs in CI. You can enable the local commit hook too:
 
-- CI runs `tools/check_content.py` on every push and pull request.
-- The same check runs before each local commit once you enable the hook:
+```sh
+git config core.hooksPath .githooks
+```
 
-  ```sh
-  git config core.hooksPath .githooks
-  ```
+Don't skip a failed check with `--no-verify`. If the check is wrong, fix it in a separate PR and explain why. Links to game downloads, keys or firmware will be removed.
 
-A failing check is never bypassed with `--no-verify`. If it flags a file by mistake, change the check in a separate pull request and say why.
+## Reporting a bug
 
-Links to game files, keys or firmware in issues or pull requests get the issue closed and the content removed.
+Use an issue form and include:
 
-## Code from other projects
+- Your port and game version.
+- Your GPU and driver.
+- What happened and how to reproduce it.
+- The relevant log, after checking it for personal paths.
 
-Code may be copied only from projects under MIT, BSD, ISC, zlib or Apache-2.0. Each copy keeps its original header and gets a row in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) with the source commit.
-
-GPL projects (yuzu, suyu, OpenSmash-Ultimate, Unicorn inside the game binary) can be read to understand behaviour, but their code is not copied. Unicorn is fine as a separate test tool.
-
-## Reporting bugs
-
-Use the issue form. Include the port version and game update from the title line of the settings menu (F1), your GPU and driver (Copy system info in the menu's Advanced tab copies them), the log (`logs\engage.log` next to `engage.exe`; after a crash, copy it before you start the game again), and the steps to reproduce. Screenshots are fine; recordings of long gameplay are not needed.
+The F1 menu shows version details and has a **Copy system info** option in Advanced. Logs are in `logs/engage.log` next to `engage.exe`. After a crash, copy the log before starting the game again. A screenshot can help, but you don't need to record a long playthrough.
 
 ## Pull requests
 
-**Target contributor pull requests at `dev`, not `main`.** Create your feature
-or fix branch from the latest `dev`, then select `dev` as the PR's base branch.
-Link the related issue and describe the change and its validation. For bugs,
-record the reproduction, diagnosis and test results in the issue.
+**Open contributor PRs against `dev`, not `main`.** Start your feature or fix branch from the latest `dev`. Link the issue if there is one, explain what changed, and say how you tested it.
 
-Maintainers may apply small documentation or wording edits directly, without a
-PR. Code fixes and features follow the issue/PR workflow below.
+Code fixes and features go through an issue/PR. Small documentation or wording edits by maintainers don't need a PR.
 
-Our workflow is **issue → feature/fix branch → PR into `dev` → release PR into
-`main` → release**. `dev` is the integration branch; `main` is the stable release
-branch. Maintainers open a separate PR from `dev` into `main` when changes are
-ready for release. Merge only after the relevant local tests and GitHub checks
-pass. Keep `dev` after a release merge and synchronize it with `main`. Build
-public release assets from the reviewed, tagged source; game-dependent test
-files stay local.
+The workflow is:
 
-- One topic per pull request.
-- Describe the problem, then what changed.
-- Say how you tested it: which version, which scene, how long.
-- A change to the lifter (`recomp/`) or the CPU headers passes the differential tests in [docs/building.md](docs/building.md), "Checks".
-- Commit messages are plain sentences, without `feat:` or other prefixes.
-- AI-assisted code is welcome. You are responsible for having read and run it.
+1. Record the bug or planned change in an issue.
+2. Work on a feature/fix branch and open a PR into `dev`.
+3. Run the relevant local tests and let the GitHub checks pass before merging.
+4. When it's ready for a release, maintainers open a separate `dev` → `main` PR.
+5. Tag the reviewed source and build the release from it. Keep `dev` synced with `main` after the merge.
+
+Keep each PR focused on one topic. For game testing, include the version, scene and roughly how long you played. Changes to the lifter or CPU headers also need the differential tests in [the engine build guide](docs/building.md#checks).
+
+Use plain English commit messages, without prefixes like `feat:`. Please read and test what you submit.
+
+## Reusing code
+
+Code copied from another project must be MIT, BSD, ISC, zlib or Apache-2.0. Keep its copyright header and add the source, commit and license to [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+GPL projects can be read to understand behavior, but their code isn't copied here. Unicorn is fine as a separate test tool, not as part of the game executable.
 
 ## Code and docs
 
-- Code, comments, commit messages and documentation are in English.
-- Generated code is never edited by hand: change the generator.
+Write in English. Don't edit generated game code by hand—fix the generator instead.

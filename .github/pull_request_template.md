@@ -1,16 +1,15 @@
-Please target **`dev`** as the base branch for contributions. Maintainer release
-PRs promote `dev` into `main`.
-Small documentation or wording edits by maintainers do not need a PR.
+Open contribution PRs against **`dev`**. Maintainer release PRs go from `dev` to `main`.
+Small documentation or wording edits by maintainers don't need a PR.
 
-## Summary
+## What changed?
 
-Describe the problem and resulting behavior.
+Explain the problem and what this change does.
 
 ## Related issue
 
-Link the issue, if applicable.
+Link it here, if there is one.
 
-## Validation
+## How did you test it?
 
-Describe relevant checks and any remaining limits. Keep game data, keys,
-firmware, generated code and locally compiled game executables out of the PR.
+Include the checks you ran and anything that still needs testing. Don't attach game
+files, keys, firmware, generated game code or a built game executable.

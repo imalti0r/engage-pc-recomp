@@ -1,9 +1,8 @@
 # Fire Emblem Engage Windows port
 
-Status: experimental native Windows build. The user has completed the first battle,
-including attack cutscenes, and confirmed audible sound. The opening movie, title and
-character preview render. Full-game completion, save/load and long-session stability
-remain unverified.
+The Windows build has made it through the first battle, including attack cutscenes
+and sound. The opening movie, title screen and character preview work too. Save/load,
+a full playthrough and longer sessions still need testing.
 The inherited installer, extraction commands, and default build targets still target TotK. Do not feed Engage
 containers to tools/extract.py or use TotK's patch files on Engage.
 

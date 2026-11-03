@@ -1,8 +1,10 @@
 # Building Engage PC Recomp
 
-This is a developer source preview for Windows x86-64. Use Engage's commands below, not the inherited TotK installer or patch lists. Keep the checkout in a writable folder with ample disk space: both extracted and packed RomFS occupy roughly 16 GB, in addition to game containers, tools, generated C and objects.
+These instructions are for building the Windows port yourself. If you just want to play, use the [setup guide](installing-engage.md).
 
-Prerequisites: Git, Python 3.12 and 3.14, .NET 10 SDK, Visual Studio C++ build tools (for the shader translator's NativeAOT link), and Windows PowerShell. The game requires an AVX2-capable CPU and a compatible Vulkan GPU; the tested machine has an RTX 4060. These are not minimum-performance guarantees.
+Use a writable folder with plenty of space. The extracted game and packed RomFS each take about 16 GB, before counting your dumps, tools and build files. Use the Engage commands below; TotK's patch lists are for a different game.
+
+You'll need Git, Python 3.12 and 3.14, the .NET 10 SDK, Visual Studio C++ build tools for the shader translator, and Windows PowerShell. To run the game, you need an x86-64-v3 CPU with AVX2 and a Vulkan 1.3 GPU. Testing so far has been on an RTX 4060.
 
 ## Prepare tools
 
@@ -19,11 +21,11 @@ dotnet publish tools/nx_extract/nx_extract.csproj -c Release --artifacts-path bu
 .venv/Scripts/python tools/build_xlate.py
 ```
 
-Compiler/runtime downloads are pinned and verified by the inherited release tooling. The extractor uses pinned LibHac 0.19.0. No compiler, extractor or dependency executable is taken from a user's local game build.
+Toolchain downloads are checked against pinned hashes. The extractor uses LibHac 0.19.0.
 
 ## Supply your own inputs
 
-Copy `config.engage.example.toml` to `config.local.toml`. Enter local paths for your base NSP, update 2.0.0 NSP, keys, firmware NCA directory and both supported DLC packages. The current extraction workflow requires both DLCs; installing without them is not yet a supported setup path. An update package must include a valid ticket or be usable with your own matching title key. This project does not supply keys, firmware, tickets or game downloads.
+Copy `config.engage.example.toml` to `config.local.toml` and fill in your local file paths: base game, 2.0.0 update, keys and extracted firmware folder. DLC is optional; leave out the DLC entries you aren't using. The update needs a valid ticket or your matching title key. Game files, firmware and keys aren't provided here.
 
 ```powershell
 .venv-py314/Scripts/python tools/extract_engage.py
@@ -31,7 +33,7 @@ Copy `config.engage.example.toml` to `config.local.toml`. Enter local paths for 
 .venv/Scripts/python tools/pack_engage_romfs.py --source build/extracted/engage-v200/RomFS --out build/extracted/engage-v200/packed-romfs
 ```
 
-Extraction verifies package identity, the target update and content integrity. Packing refuses to overwrite an existing output. Inspect an interrupted setup before retrying; do not delete your input dumps or profile.
+The extractor checks the packages, update version and content integrity. The packer won't overwrite an existing output. If a step stops halfway through, check what it left behind before retrying. Keep your dumps and profile safe.
 
 ## Recompile locally
 
@@ -41,9 +43,9 @@ Extraction verifies package identity, the target update and content integrity. P
 .\Run-Engage.cmd
 ```
 
-Adjust compile jobs to your machine's available memory. Generation and the first compilation take time. Keep the generated C private. The build generates the Windows icon locally from the extracted game icon; neither icon nor compiled game code belongs in a public archive.
+Lower `--jobs` if your machine is running out of memory. The first build takes a while. Generated game code, the built executable and the icon extracted from your game all stay private.
 
-The launcher selects Vulkan, disables the experimental recorder and locates your extracted shared fonts. F1 opens settings, F10 changes the performance overlay and F11 changes fullscreen. Preserve `build/profile-engage` when rebuilding.
+The launcher sets Vulkan and the shared-font path, with the experimental recorder turned off. **F1** opens settings, **F10** changes the performance overlay, and **F11** toggles fullscreen. Keep `build/profile-engage` when rebuilding—that's your player data.
 
 ## Check changes
 
@@ -53,9 +55,12 @@ The launcher selects Vulkan, disables the experimental recorder and locates your
 .venv/Scripts/python tests/extract_engage_test.py
 .venv/Scripts/python tests/continuations_test.py
 build/engage-v200-cont/engage.exe --selftest
+build/engage-v200-cont/engage.exe --probe-menu-font
 build/engage-v200-cont/engage.exe --probe-audout
 build/engage-v200-cont/engage.exe --probe-engage-fs
 build/engage-v200-cont/engage.exe --probe-engage-input
 ```
 
-Lifter changes also require the differential checks in the inherited [engine build guide](building.md). Passing source-only CI does not establish game playability. See [porting notes](engage-port.md) for observed results and limits.
+The Engage filesystem/DLC probe expects both DLC packages to be installed.
+
+For lifter changes, also run the differential tests in [the engine build guide](building.md). Passing CI doesn't tell us whether a whole playthrough works. Check [the porting notes](engage-port.md) for what has actually been tested.

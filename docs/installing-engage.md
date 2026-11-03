@@ -1,50 +1,57 @@
-# Installing Engage PC Recomp
+# Setting up Engage PC Recomp
 
-Windows setup is available as an [experimental prerelease](https://github.com/veneito/engage-pc-recomp/releases/tag/engage-v0.1.0-alpha.3). The setup pipeline passed a local installation test on a second drive; clean-machine and full-game testing remain outstanding. Use the Engage setup package below.
+[Download alpha.3 for Windows](https://github.com/veneito/engage-pc-recomp/releases/tag/engage-v0.1.0-alpha.3). This is still an alpha. Setup has worked in local testing, but clean Windows installs and the full game still need testing.
 
 ## What you need
 
-| Requirement | Details |
+| Item | What to use |
 | --- | --- |
 | Windows | Windows 10 or 11, 64-bit |
 | CPU | x86-64-v3, including AVX2 |
-| Graphics | Vulkan 1.3-capable GPU with a current driver |
-| Storage | At least 40 GiB free on the installation drive, in addition to your input files |
-| Game | Your base Engage NSP or XCI and the cumulative **2.0.0** update NSP |
-| Keys | Your console's `prod.keys`; `title.keys` if your update needs it |
-| Firmware | Your extracted firmware folder containing NCA files, for the shared fonts |
-| Optional DLC | Expansion Pass and/or Order of Heroes Item Set, as separate NSPs |
+| Graphics | A Vulkan 1.3 GPU with a current driver |
+| Free space | At least 40 GiB on the install drive, plus space for your dumps |
+| Base game | Your Engage NSP or XCI |
+| Update | The Engage **2.0.0** update NSP |
+| Keys | Your console's `prod.keys`, plus `title.keys` if the update needs it |
+| Firmware | An extracted folder containing the firmware NCA files |
+| Optional DLC | Expansion Pass and/or Order of Heroes Item Set NSPs |
 
-Setup includes Python, the compiler and a self-contained extractor. You do not need to install Python, Visual Studio or .NET separately. Game files, keys and firmware are supplied by you and stay on your computer.
+Python, the compiler and the extractor come with setup. You don't need to install Python, Visual Studio or .NET separately.
 
 ## Install
 
-![Engage Setup with required files grouped above the optional DLC and title-key inputs](screenshots/setup.png)
+![Engage Setup](screenshots/setup.png)
 
-1. Download the [Engage-Setup Windows ZIP](https://github.com/veneito/engage-pc-recomp/releases/download/engage-v0.1.0-alpha.3/Engage-Setup-0.1.0-alpha.3-windows.zip). Extract the entire ZIP; keep its folders together. The [release page](https://github.com/veneito/engage-pc-recomp/releases/tag/engage-v0.1.0-alpha.3) includes SHA-256 checksums.
-2. Open **Engage-Setup.exe**. Choose your base game, update **2.0.0**, `prod.keys` and extracted firmware folder. Add either DLC and `title.keys` if needed.
-3. Choose a separate, empty installation folder, such as `D:\Games\Engage`. Select **Install Engage**. Setup checks your hardware, verifies and extracts the game, recompiles it locally, and installs it. Allow 20–60 minutes initially; time varies by CPU and storage.
-4. Select **Play Engage**. Later, open **Play Engage.cmd** in your installation folder. Press **F1** for settings and controls.
+1. Download the [Windows setup ZIP](https://github.com/veneito/engage-pc-recomp/releases/download/engage-v0.1.0-alpha.3/Engage-Setup-0.1.0-alpha.3-windows.zip) and **extract the entire ZIP**. Keep its files and folders together. Checksums are on the [release page](https://github.com/veneito/engage-pc-recomp/releases/tag/engage-v0.1.0-alpha.3).
+2. Run **Engage-Setup.exe** and fill in the file paths. Make sure the update is **2.0.0**. For firmware, pick the folder with the NCA files inside, not the ZIP. Add either DLC and `title.keys` if needed.
+3. Pick a separate, empty install folder, like `D:\Games\Engage`, then click **Install Engage**. Allow around 20–60 minutes the first time. Your CPU and drive will affect how long it takes.
+4. When setup finishes, click **Play Engage**. After that, launch through **Play Engage.cmd** in your install folder. Press **F1** for settings and controls.
 
-Your original dumps are unchanged. The installed executable contains locally generated game code: keep the installation private. The installed game icon and fonts come from your inputs, rather than from the downloadable setup.
+Your original dumps aren't changed. The installed game icon and shared fonts come from your files. Keep the built game private—it contains game code.
 
-## If setup stops
+## If something goes wrong
 
-- **Missing file:** select the actual file after extracting any outer archive. A firmware ZIP must be extracted into an NCA folder first.
-- **Wrong update:** this port targets Engage **2.0.0**, title ID `0100A6301214E800`. Other game versions are rejected.
-- **Ticket or title-key error:** firmware keys do not replace a game's title key. Use a valid dump from your console; optionally select your `title.keys`. Never paste keys into an issue.
-- **No Vulkan 1.3 GPU:** install the current graphics driver for your GPU and retry.
-- **Not enough space:** choose a drive with at least 40 GiB free. Temporary extraction and compilation stay on that drive.
-- **Interrupted installation:** rerun the same setup with the same inputs and destination. Only completed steps are checkpointed. If setup reports missing or inconsistent work, use a fresh folder and keep the original installation's profile.
+- **File not found:** extract any outer archive first, then select the actual game file. Extract the firmware ZIP before picking its folder too.
+- **Wrong update:** you need Engage **2.0.0**, title ID `0100A6301214E800`. Other updates won't work with this build.
+- **Missing title key or ticket:** firmware keys won't replace a game's title key. Use a valid dump from your console and select your matching `title.keys` if needed. Don't paste key values into an issue.
+- **No Vulkan 1.3 GPU:** update your graphics driver and try again.
+- **Not enough space:** choose a drive with at least 40 GiB free. Setup keeps its temporary extraction and build files on that drive.
+- **Setup was interrupted:** open the same setup version, choose the same inputs and install folder, and try again. Completed steps are kept. If it says the files changed or work is missing, use a fresh folder and keep your old profile.
 
-The progress window offers a log view. Errors include the setup log's location. Review personal paths before sharing a log. Do not attach game containers, extracted files, keys, firmware, generated code, saves or compiled game executables.
+Click **Show log** for more detail. The error screen also gives you the log's location. Remove personal paths before sharing a log, and don't attach game files, keys, firmware, generated code, saves or a built executable.
 
-## Playing and keeping saves
+## Saves and settings
 
-Settings are in `engage.ini`; the player profile is in `profile`, both inside the chosen installation folder. Back up `profile` before experimenting. Setup does not overwrite an existing profile or settings file.
+Inside your install folder:
 
-Shader caches populate during play, so first-time effects may pause briefly. This alpha has been tested through the first battle with audio and attack cutscenes; save/load, post-battle transitions, full-game completion and long sessions remain unverified. See the [current status](../README.md#current-status) before reporting a problem.
+- `profile` holds your saves and player data. Back it up before experimenting.
+- `engage.ini` holds your settings.
+- `Play Engage.cmd` starts the game with the graphics and font paths set.
 
-## Updating this alpha
+Setup leaves existing profiles and settings alone. The first time you see an effect, the game may pause while it builds shaders. Save/load, progress after the first battle and long sessions still need testing. See [what's working](../README.md#whats-working) for the current status.
 
-The candidate supports resuming the **same** setup build. In-place upgrades between setup versions are not implemented yet. Install a newer version into a fresh folder and keep your existing profile; do not delete your old installation until your saves have been checked in the new one.
+## Updating
+
+You can resume with the **same setup version**, but updating an existing install to a different version isn't supported yet. Install the newer version into a fresh folder. Keep your old `profile` and settings backed up, and don't delete the old install until you've checked your saves in the new one.
+
+If you're on alpha.2, use alpha.3 or newer to fix the F1 settings-menu crash.
