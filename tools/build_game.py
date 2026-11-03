@@ -863,7 +863,10 @@ def main():
         if not args.make_game_runtime:
             private = game_library.private_glue(sys.modules[__name__], layout, linked, hashes, paths, args.version)
             write_if_changed(out / 'game_private.c', private)
-            game_key = game_library.fingerprint(compatibility, private, mods, GEN_FLAGS)
+            headers = [out / 'romfs_config.h', gen / 'layout.h']
+            if (gen / 'patches.h').is_file():
+                headers.append(gen / 'patches.h')
+            game_key = game_library.fingerprint(compatibility, private, mods, GEN_FLAGS, headers)
             reuse_game = not args.full_build and game_library.reusable(out, game_key)
             if reuse_game:
                 print('build_game: reusing verified engage_game.dll; no game-code compilation required', flush=True)

@@ -12,6 +12,14 @@ import game_library
 
 
 class LibraryCacheTest(unittest.TestCase):
+    def test_romfs_identity_change_invalidates_cached_game_metadata(self):
+        with tempfile.TemporaryDirectory() as temp:
+            header = Path(temp) / 'romfs_config.h'
+            header.write_text('original game image identity')
+            before = game_library.fingerprint('contract', 'private', {}, [], [header])
+            header.write_text('changed game image identity')
+            self.assertNotEqual(before, game_library.fingerprint('contract', 'private', {}, [], [header]))
+
     def test_runtime_fixes_keep_contract_but_cpu_or_patch_changes_invalidate_it(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

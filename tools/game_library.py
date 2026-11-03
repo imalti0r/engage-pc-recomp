@@ -57,8 +57,10 @@ __declspec(dllexport) const GameLibrary *engage_game_tables(void) {
 '''
 
 
-def fingerprint(compatibility, private, mods, flags):
+def fingerprint(compatibility, private, mods, flags, headers=()):
     digest = hashlib.sha256((compatibility + private + '\n'.join(flags)).encode())
+    for path in headers:
+        digest.update(path.name.encode() + b'\0' + path.read_bytes())
     for mod, files in mods.items():
         for path in files:
             digest.update((mod + '/' + path.name).encode())
