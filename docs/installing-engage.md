@@ -52,6 +52,6 @@ Setup leaves existing profiles and settings alone. The first time you see an eff
 
 ## Updating
 
-You can resume with the **same setup version**, but updating an existing install to a different version isn't supported yet. Install the newer version into a fresh folder. Keep your old `profile` and settings backed up, and don't delete the old install until you've checked your saves in the new one.
+To update, run the newer setup on your existing install folder and pick the same input files. Your game data, saves and settings are kept; setup rebuilds `engage.exe` and skips extraction. It also skips the lift when the lifter and patches are unchanged, which keeps about 4 GiB of generated files in the install's `.setup-work` folder. Close Engage first. If setup says the executable changed or work is missing, use a fresh folder and keep your old `profile`.
 
 If you're on alpha.2, use alpha.3 or newer to fix the F1 settings-menu crash.

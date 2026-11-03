@@ -42,6 +42,8 @@ class FrameRateTest(unittest.TestCase):
             pipeline = Pipeline(Form(dest=temp), SimpleNamespace(root=ROOT), Reporter(out=io.StringIO()))
             calls = []
             pipeline.python = lambda *args: calls.append(args)
+            pipeline.state = {}
+            (pipeline.extracted / 'ExeFS').mkdir(parents=True)
             pipeline.lift()
             args = calls[0]
             self.assertEqual(args[args.index('--patches') + 1], ROOT / 'recomp/patches-engage-v200.txt')

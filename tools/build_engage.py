@@ -19,7 +19,8 @@ def main():
     extra, remaining = parser.parse_known_args()
     sys.argv = [sys.argv[0], *remaining]
     extracted = extra.extracted.resolve()
-    report = inspect_inputs(extracted / 'ExeFS', extracted / 'RomFS')
+    # An updated install has already moved its RomFS into the game folder, so the marker is checked only when present.
+    report = inspect_inputs(extracted / 'ExeFS', extracted / 'RomFS' if (extracted / 'RomFS').is_dir() else None)
     report['dlc'] = inspect_dlcs(extracted / 'aoc', require_all=False)
     npdm = extracted / 'ExeFS' / 'main.npdm'
     report['exefs_sha256']['main.npdm'] = hashlib.sha256(npdm.read_bytes()).hexdigest()
