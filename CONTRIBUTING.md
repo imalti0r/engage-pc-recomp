@@ -29,13 +29,18 @@ Use the issue form. Include the port version and game update from the title line
 
 ## Pull requests
 
-Our development workflow is **issue → `dev` → pull request → `main` → release**.
-Record the reproduction, diagnosis and test results in an issue. Start work on
-`dev` synchronized with `main`, and open a PR from `dev` into `main` that links
-the issue (`Fixes #number` when it resolves the report). Merge only after the
-relevant local tests and GitHub checks pass. Keep `dev` after merging and
-fast-forward it to `main` before the next change. Build public release assets
-from the reviewed, tagged source; game-dependent test files stay local.
+**Target contributor pull requests at `dev`, not `main`.** Create your feature
+or fix branch from the latest `dev`, then select `dev` as the PR's base branch.
+Link the related issue and describe the change and its validation. For bugs,
+record the reproduction, diagnosis and test results in the issue.
+
+Our workflow is **issue → feature/fix branch → PR into `dev` → release PR into
+`main` → release**. `dev` is the integration branch; `main` is the stable release
+branch. Maintainers open a separate PR from `dev` into `main` when changes are
+ready for release. Merge only after the relevant local tests and GitHub checks
+pass. Keep `dev` after a release merge and synchronize it with `main`. Build
+public release assets from the reviewed, tagged source; game-dependent test
+files stay local.
 
 - One topic per pull request.
 - Describe the problem, then what changed.
