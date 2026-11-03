@@ -8,7 +8,7 @@ there is no guaranteed response time or security audit coverage.
 
 ## Reporting a vulnerability
 
-Use GitHub's [private vulnerability reporting form](https://github.com/veneito/engage-pc-recomp/security/advisories/new)
+Open a [confidential issue](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/issues/new?issuable_template=&issue[confidential]=true)
 for security problems in the setup tools, runtime or release packages. Please do not
 publish exploit details in a public issue before maintainers have reviewed the report.
 
@@ -18,7 +18,7 @@ generated game code or a built game executable. Remove secrets and personal path
 from logs. Maintainers may ask for a synthetic reproducer instead.
 
 Ordinary crashes, graphics problems and installation errors belong in the
-[issue tracker](https://github.com/veneito/engage-pc-recomp/issues/new/choose).
+[issue tracker](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/issues/new).
 
 Maintainers will review reports, discuss any needed details privately and coordinate
 a fix and disclosure with the reporter. Credit is optional; say if you prefer to

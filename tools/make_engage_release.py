@@ -162,7 +162,7 @@ def build(out):
         'Setup builds the game locally. No game files or keys are included.\n'
         'First install may take 20–60 minutes. Shaders cache during play.\n'
         'Keep your original dumps. Saves/settings are in your chosen install folder.\n'
-        'Help: https://github.com/veneito/engage-pc-recomp\n', encoding='utf-8')
+        'Help: https://gitlab.com/engage-pc-recomp/engage-pc-recomp\n', encoding='utf-8')
     upstream.run([out / 'python/python.exe', '-I', '-m', 'engage_setup', '--help'], env=upstream.clean_env())
     with tempfile.TemporaryDirectory(prefix='engage-no-input-') as temp:
         dest = Path(temp) / 'install'

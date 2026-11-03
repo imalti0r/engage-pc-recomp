@@ -1,6 +1,6 @@
 # Setting up Engage PC Recomp
 
-[Download alpha.4 for Windows](https://github.com/veneito/engage-pc-recomp/releases/tag/engage-v0.1.0-alpha.4). This is still an alpha. Setup has worked in local testing, but clean Windows installs and the full game still need testing.
+[Download alpha.4 for Windows](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.4). This is still an alpha. Setup has worked in local testing, but clean Windows installs and the full game still need testing.
 
 ## What you need
 
@@ -22,7 +22,7 @@ Python, the compiler and the extractor come with setup. You don't need to instal
 
 ![Engage Setup](screenshots/setup.png)
 
-1. Download the [Windows setup ZIP](https://github.com/veneito/engage-pc-recomp/releases/download/engage-v0.1.0-alpha.4/Engage-Setup-0.1.0-alpha.4-windows.zip) and **extract the entire ZIP**. Keep its files and folders together. Checksums are on the [release page](https://github.com/veneito/engage-pc-recomp/releases/tag/engage-v0.1.0-alpha.4).
+1. Download the [Windows setup ZIP](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.4/downloads/Engage-Setup-0.1.0-alpha.4-windows.zip) and **extract the entire ZIP**. Keep its files and folders together. Checksums are on the [release page](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.4).
 2. Run **Engage-Setup.exe** and fill in the file paths. Make sure the update is **2.0.0**. For firmware, pick the folder with the NCA files inside, not the ZIP. Add either DLC and `title.keys` if needed.
 3. Pick a separate, empty install folder, like `D:\Games\Engage`, then click **Install Engage**. Allow around 20–60 minutes the first time. Your CPU and drive will affect how long it takes.
 4. When setup finishes, click **Play Engage**. After that, launch through **Play Engage.cmd** in your install folder. Press **F1** for settings and controls.

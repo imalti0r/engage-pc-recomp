@@ -12,7 +12,7 @@ apply to project issues, pull requests and other project-managed spaces.
 Maintainers may edit or remove content, lock discussions or restrict participation.
 They will consider the context and severity of the behavior when deciding what to do.
 
-To report a problem, contact [@veneito](https://github.com/veneito) using a contact
+To report a problem, contact [@rjrussellh03](https://gitlab.com/rjrussellh03) using a contact
 method listed on their profile. For public incidents, you can also mention the
 maintainer in the affected discussion. Do not post private information in a report.
 If the report concerns a maintainer, contact another maintainer if one is available;
