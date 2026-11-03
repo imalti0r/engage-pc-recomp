@@ -38,7 +38,7 @@ The extractor checks the packages, update version and content integrity. The pac
 ## Recompile locally
 
 ```powershell
-.venv/Scripts/python recomp/gen.py --exefs build/extracted/engage-v200/ExeFS --out generated/engage-v200-cont --no-callee-saved-trust --continuations
+.venv/Scripts/python recomp/gen.py --exefs build/extracted/engage-v200/ExeFS --out generated/engage-v200-cont --patches recomp/patches-engage-v200.txt --no-callee-saved-trust --continuations
 .venv/Scripts/python tools/build_engage.py --gen generated/engage-v200-cont --out build/engage-v200-cont --jobs 12
 .\Run-Engage.cmd
 ```
@@ -46,6 +46,25 @@ The extractor checks the packages, update version and content integrity. The pac
 Lower `--jobs` if your machine is running out of memory. The first build takes a while. Generated game code, the built executable and the icon extracted from your game all stay private.
 
 The launcher sets Vulkan and the shared-font path, with the experimental recorder turned off. **F1** opens settings, **F10** changes the performance overlay, and **F11** toggles fullscreen. Keep `build/profile-engage` when rebuilding—that's your player data.
+
+The Engage patch table enables the game's 60 FPS timing path and checks the main
+module's build ID and original instruction before generation. F1's Game tab offers
+30 FPS (original timing) or 60 FPS; restart after changing it. Rates above 60 are
+unsupported. Presentation VSync controls how frames reach the display; disabling
+it alone does not unlock the game's frame rate. Alpha.3 does not include this patch.
+
+The source build's menu hides inherited controls that currently have no Engage
+implementation: game output resolution, internal render scale, field of view,
+TotK's real-time/cloth/high-FPS patches, Xbox prompt graphics and the TotK LOD
+guard. Virtual core preemption is also hidden because Engage uses cooperative
+boundaries for GC snapshots. The gyro-aiming control is hidden pending verification
+of an Engage gameplay feature that uses it. The performance overlay omits the unmeasured Unity
+scene resolution instead of showing TotK's dimensions.
+
+Window size, fullscreen, display upscaling/sharpening, color adjustment, volume,
+input bindings and the general Vulkan controls remain available. Button mapping
+still supports Nintendo and Xbox layouts; in-game button images stay Nintendo.
+Features useful to Engage can return when they have an implementation and tests.
 
 ## Check changes
 

@@ -69,6 +69,11 @@ static void step_store(float seconds) {
 static void frame_limit_live(void);
 
 void frame_step_init(void) {
+    if (RT_ENGAGE) {
+        frame_limit_live();
+        rt_log("frame rate: Engage %.0f fps target (restart to change); native Unity timing", frame_step_limit_hz());
+        return;
+    }
     int fps60 = rt_patch_set("fps60"), realtime = rt_patch_set("realtime"), cloth = rt_patch_set("cloth");
     if (realtime < 0) {
         rt_log("frame rate: no patch table, shipping 30 fps whole-vsync steps");
@@ -115,16 +120,19 @@ static int limit_parse(void) {
 }
 
 static void frame_limit_live(void) {
+    // Engage caches Unity's vsync count in scene logic; change both timing and pacing only at startup.
+    if (RT_ENGAGE && limit_read) return;
     unsigned v = cfg_version();
     if (limit_read && v == limit_seen) return;
     limit_read = 1;
     limit_seen = v;
     int hz = limit_parse();
+    if (RT_ENGAGE) hz = hz == 30 ? 30 : 60;
     if (hz == limit_hz) return;
     limit_hz = hz;
     if (fps60_set == -2) fps60_set = rt_patch_set("fps60");
     if (fps60_set >= 0) rt_patch_switch(fps60_set, hz != 30);
-    if ((hz > 60 || hz == 0) && !step_word)
+    if (!RT_ENGAGE && (hz > 60 || hz == 0) && !step_word)
         rt_log("frame rate: limits above 60 need the real-time step (TOTK_REALTIME=1); 60 fps");
     else if (hz) rt_log("frame rate: limit %d fps", hz);
     else if (gfx_window_refresh_hz() > 0) rt_log("frame rate: limit at the monitor's refresh rate (%.3f Hz now)", gfx_window_refresh_hz());

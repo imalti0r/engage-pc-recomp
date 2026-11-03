@@ -292,7 +292,7 @@ static int create_swapchain(void) {
     if (nf > 64) nf = 64;
     vkGetPhysicalDeviceSurfaceFormatsKHR(c->phys, g_surface, &nf, fmts);
     if (!nf) return 0;
-    // UNORM: the blit writes the bytes the game wrote (no sRGB encode).
+    // UNORM: presentation supplies display-encoded values (sRGB sources pass through vk_color_record).
     VkSurfaceFormatKHR sf = fmts[0];
     int found = 0;
     for (uint32_t i = 0; i < nf && !found; i++)
