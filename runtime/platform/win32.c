@@ -602,6 +602,76 @@ __attribute__((noinline)) static void crash_from_runtime(const char *what, uint3
     crash_fn(&c);
 }
 
+// The name a DLL records for itself in its export directory ("amdvlk64.dll"). Read from its mapped headers, not through
+// the loader, whose lock another thread may hold when the process crashes.
+static const char *image_name(const char *base) {
+    const IMAGE_NT_HEADERS64 *nt = (const void *)(base + ((const IMAGE_DOS_HEADER *)base)->e_lfanew);
+    const IMAGE_DATA_DIRECTORY *d = &nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+    if (!d->VirtualAddress || !d->Size) return "unnamed module";
+    return base + ((const IMAGE_EXPORT_DIRECTORY *)(base + d->VirtualAddress))->Name;
+}
+
+// The return addresses in [lo, lo + size) on the crashed thread's stack, innermost first: unwinds the faulting context
+// with the x64 unwind tables; a function without a table entry (a leaf, or address 0 after a call through a null
+// pointer) has its return address on top of the stack. The walk stops at return address 0 (the thread's first frame)
+// and when the stack pointer leaves the thread's stack, so a damaged stack ends it instead of faulting.
+static int frames_in(const CONTEXT *at, uintptr_t lo, uintptr_t size, uintptr_t *out, int max) {
+    CONTEXT c = *at;
+    ULONG_PTR low, high;
+    GetCurrentThreadStackLimits(&low, &high);
+    int n = 0;
+    for (int i = 0; i < 256 && n < max && (c.Rip || !i) && c.Rsp >= low && c.Rsp + 8 <= high; i++) {
+        DWORD64 img;
+        RUNTIME_FUNCTION *fe = RtlLookupFunctionEntry(c.Rip, &img, NULL);
+        if (fe) {
+            void *data;
+            DWORD64 frame;
+            RtlVirtualUnwind(UNW_FLAG_NHANDLER, img, c.Rip, fe, &c, &data, &frame, NULL);
+        } else {
+            c.Rip = *(const DWORD64 *)c.Rsp;
+            c.Rsp += 8;
+        }
+        if (c.Rip - lo < size) out[n++] = (uintptr_t)c.Rip;
+    }
+    return n;
+}
+
+// The last-chance filter: an exception no handler took, in any module. crash_veh reports faults in this executable as
+// they happen; this one catches the rest, which used to end the process with no line in the log: a fault in a GPU
+// driver's own thread or in a driver call (vkQueueSubmit, vkAllocateMemory), a C++ exception a library let escape, a
+// call through a null pointer (rip 0, outside every module). Windows calls it only after every handler declined, so
+// the exceptions drivers raise and catch themselves never get here; it costs nothing until a crash.
+static LONG WINAPI crash_filter(EXCEPTION_POINTERS *ep) {
+    const EXCEPTION_RECORD *er = ep->ExceptionRecord;
+    DWORD code = er->ExceptionCode;
+    uintptr_t rip = (uintptr_t)ep->ContextRecord->Rip;
+    PlatCrash c = {code == EXCEPTION_ACCESS_VIOLATION        ? "access violation"
+                   : code == EXCEPTION_ILLEGAL_INSTRUCTION   ? "illegal instruction"
+                   : code == EXCEPTION_INT_DIVIDE_BY_ZERO    ? "integer division by zero"
+                   : code == EXCEPTION_PRIV_INSTRUCTION      ? "privileged instruction"
+                   : code == EXCEPTION_STACK_OVERFLOW        ? "stack overflow"
+                   : code == EXCEPTION_IN_PAGE_ERROR         ? "in-page error"
+                   : code == EXCEPTION_BREAKPOINT            ? "breakpoint"
+                   : code == 0xe06d7363u                     ? "C++ exception"
+                   : code == 0xc0000374u                     ? "heap corruption"   // STATUS_HEAP_CORRUPTION
+                                                             : "unhandled exception",
+                   (uint32_t)code, rip, 0, -1, 0};
+    if (code == EXCEPTION_ACCESS_VIOLATION && er->NumberParameters >= 2)
+        c.access = (int)er->ExceptionInformation[0], c.addr = er->ExceptionInformation[1];
+    void *base = NULL;
+    RtlPcToFileHeader((void *)rip, &base);
+    MODULEINFO mi;
+    uintptr_t exe = (uintptr_t)GetModuleHandleW(NULL);
+    c.offset = rip - (uintptr_t)base;
+    if (!base) c.module = "";
+    else if ((uintptr_t)base != exe) c.module = image_name(base);
+    if (c.module && GetModuleInformation(GetCurrentProcess(), (HMODULE)exe, &mi, sizeof mi))
+        c.nframes = frames_in(ep->ContextRecord, exe, mi.SizeOfImage, c.frames,
+                              (int)(sizeof c.frames / sizeof *c.frames));
+    crash_fn(&c);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
 static void abort_signal(int sig) { crash_from_runtime("abort", (uint32_t)sig); }
 
 static void invalid_parameter(const wchar_t *expr, const wchar_t *func, const wchar_t *file, unsigned line,
@@ -613,6 +683,7 @@ static void invalid_parameter(const wchar_t *expr, const wchar_t *func, const wc
 void plat_crash_hook(void (*fn)(const PlatCrash *c)) {
     crash_fn = fn;
     AddVectoredExceptionHandler(0, crash_veh);
+    SetUnhandledExceptionFilter(crash_filter);   // replaces the C runtime's filter; crash_fn never returns
     signal(SIGABRT, abort_signal);
     _set_invalid_parameter_handler(invalid_parameter);
 }
@@ -803,7 +874,11 @@ const void *plat_file_map(PlatFile *f) {
     return v;
 }
 
+static __thread DWORD fs_last_error;
+int plat_fs_os_error(void) { return (int)fs_last_error; }
+
 static int fs_err(DWORD e) {
+    fs_last_error = e;
     switch (e) {
     case ERROR_FILE_NOT_FOUND: case ERROR_PATH_NOT_FOUND: case ERROR_DIRECTORY: return PLAT_FS_NOT_FOUND;
     case ERROR_FILE_EXISTS: case ERROR_ALREADY_EXISTS: return PLAT_FS_EXISTS;
@@ -813,12 +888,23 @@ static int fs_err(DWORD e) {
     }
 }
 
+// A symbolic link or junction is a link: removed as a link, never followed. Any other reparse point (OneDrive's cloud
+// placeholders, deduplicated files) is an ordinary file or directory whose content the file system fetches on access.
+static int fs_kind_of(const WIN32_FIND_DATAW *fd) {
+    DWORD a = fd->dwFileAttributes;
+    if (a & FILE_ATTRIBUTE_REPARSE_POINT && (fd->dwReserved0 == IO_REPARSE_TAG_SYMLINK || fd->dwReserved0 == IO_REPARSE_TAG_MOUNT_POINT))
+        return PLAT_FS_LINK;
+    return a & FILE_ATTRIBUTE_DIRECTORY ? PLAT_FS_DIR : PLAT_FS_FILE;
+}
+
 int plat_fs_kind(const char *path) {
     wchar_t w[WPATH];
     if (!widen(path, w, WPATH)) return PLAT_FS_MISSING;
-    DWORD a = GetFileAttributesW(w);
-    if (a == INVALID_FILE_ATTRIBUTES) return PLAT_FS_MISSING;
-    return a & FILE_ATTRIBUTE_REPARSE_POINT ? PLAT_FS_LINK : a & FILE_ATTRIBUTE_DIRECTORY ? PLAT_FS_DIR : PLAT_FS_FILE;
+    WIN32_FIND_DATAW fd;
+    HANDLE h = FindFirstFileW(w, &fd);   // the reparse tag comes with the find data only
+    if (h == INVALID_HANDLE_VALUE) return PLAT_FS_MISSING;
+    FindClose(h);
+    return fs_kind_of(&fd);
 }
 
 int plat_fs_mkdir(const char *path) {
@@ -830,7 +916,15 @@ int plat_fs_mkdir(const char *path) {
 int plat_fs_rmdir(const char *path) {
     wchar_t w[WPATH];
     if (!widen(path, w, WPATH)) return PLAT_FS_ERROR;
-    return RemoveDirectoryW(w) ? PLAT_FS_OK : fs_err(GetLastError());
+    if (RemoveDirectoryW(w)) return PLAT_FS_OK;
+    DWORD e = GetLastError(), a = GetFileAttributesW(w);
+    if (e == ERROR_ACCESS_DENIED && a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_READONLY)) {
+        // a read-only directory (copied over from another emulator's save folder) refuses RemoveDirectoryW
+        SetFileAttributesW(w, a & ~(DWORD)FILE_ATTRIBUTE_READONLY);
+        if (RemoveDirectoryW(w)) return PLAT_FS_OK;
+        e = GetLastError();
+    }
+    return fs_err(e);
 }
 
 int plat_fs_unlink(const char *path) {
@@ -975,9 +1069,7 @@ int plat_fs_list(const char *dir, int (*cb)(const char *name, int kind, uint64_t
         if (!wcscmp(fd.cFileName, L".") || !wcscmp(fd.cFileName, L"..")) continue;
         char name[1024];
         if (!WideCharToMultiByte(CP_UTF8, 0, fd.cFileName, -1, name, sizeof name, NULL, NULL)) continue;
-        DWORD a = fd.dwFileAttributes;
-        int kind = a & FILE_ATTRIBUTE_REPARSE_POINT ? PLAT_FS_LINK : a & FILE_ATTRIBUTE_DIRECTORY ? PLAT_FS_DIR
-                                                                                                   : PLAT_FS_FILE;
+        int kind = fs_kind_of(&fd);
         if (!cb(name, kind, (uint64_t)fd.nFileSizeHigh << 32 | fd.nFileSizeLow, ctx)) break;
     } while (FindNextFileW(h, &fd));
     FindClose(h);
