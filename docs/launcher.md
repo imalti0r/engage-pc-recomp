@@ -8,6 +8,8 @@ The version pill at the top left reads `DEV · <version>` in a development
 candidate and `v<version>` in a release ZIP. It describes the launcher package;
 the supported game version remains Engage 2.0.0.
 
+![Development launcher before a game is selected](screenshots/launcher.png)
+
 ## Play and setup
 
 When no game is selected, **Set up Engage** offers **Use existing install**
@@ -22,6 +24,8 @@ completion message explains that the original extracted setup folder can be
 deleted. Use the game folder's `Engage-Launcher.exe` for Play, settings, mods and
 Setup / Update. Keep `.launcher/` with the game; source checkouts remain in place.
 
+![Setup form with required files and optional extras](screenshots/setup.png)
+
 Play requests foreground focus for the game while the launcher stays open behind
 it. Settings, mod changes and save
 backups are blocked until it exits. A game started separately must also be closed
@@ -31,7 +35,8 @@ before these actions. The executable can still be started directly.
 
 The launcher checks published project releases in the background when it opens.
 **Settings → Check for updates** also checks manually. No game paths or inputs
-are sent. Offline checks never block Play.
+are sent. Offline checks never block Play. Unpublished branches and PR builds are
+not announced as updates.
 
 An available update offers **Update now** and **Later**. Update now asks once,
 downloads the Windows setup ZIP, compares its SHA-256 with the release's
@@ -48,6 +53,12 @@ remembered installation. Cached extraction/generated code are reused when valid;
 a code change may require a local rebuild. If inputs/cache are missing, Setup
 asks for the required files. Saves, mods and settings are retained by that pipeline.
 Updates from source checkouts remain a Git operation.
+
+For an installed launcher, these versioned tool packages remain inside the game
+folder's `.launcher/`. The game folder's `Engage-Launcher.exe` selects the active
+package. Setup verifies the new installed copy before switching to it, so the
+original download/extracted setup folder is no longer needed afterward. Keep the
+installed tool folders; deleting `.launcher/` breaks the installed launcher.
 
 ## Local game icon
 

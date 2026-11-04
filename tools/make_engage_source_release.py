@@ -14,8 +14,11 @@ ROOT = Path(__file__).resolve().parents[1]
 PRIVATE_DIRS = {'build', 'generated', 'toolchain', 'refs', '.git', '.venv', '.venv-py314', '.claude', '.agents', 'notes', '.worktrees'}
 PRIVATE_NAMES = {'config.local.toml', '.env', 'account.uid', 'engage.ini', 'engage-install.json', 'launcher-update.json'}
 BINARY_SUFFIXES = {'.exe', '.dll', '.pdb', '.o', '.obj', '.a', '.lib', '.log', '.png', '.jpg', '.jpeg', '.ico', '.webp'}
-# Reviewed empty-input screenshot of our own setup, containing no game artwork or personal paths.
-SETUP_SHOT = '61710d7d50e10ef9529ddcc7805b3e346be480614cf52e03ce0672139b6a0f28'
+# Reviewed launcher/setup screenshots, without game assets or personal paths (docs/screenshots/README.md).
+REVIEWED_SCREENSHOTS = {
+    'docs/screenshots/setup.png': '7b84a39b22804243888fefd300ad3a9c3c996967b0d3eebd15b5d8f62893265c',
+    'docs/screenshots/launcher.png': '10a6f5f32d08f682833865d4d13daa66321d955c823819a87ed07e151c8d3cee',
+}
 # Original commissioned launcher illustration/lettering, not extracted game data (art/README.md).
 LAUNCHER_ART = {
     'engage_setup/art/cathedral.jpg': '9cf31327e2e8875f6988a4a2d00d4d90bf5cc21a92d31c2c9e350b1150130e69',
@@ -33,7 +36,7 @@ def audit_member(name, data, regular=True):
     if path.name.lower() in BLOCKED_NAMES or suffix in BLOCKED_SUFFIXES:
         raise ValueError(f'Game content path: {name}')
     # This unchanged upstream logo is licensed source artwork, not an extracted game icon.
-    reviewed_screenshot = name == 'docs/screenshots/setup.png' and hashlib.sha256(data).hexdigest() == SETUP_SHOT
+    reviewed_screenshot = name in REVIEWED_SCREENSHOTS and hashlib.sha256(data).hexdigest() == REVIEWED_SCREENSHOTS[name]
     reviewed_art = name in LAUNCHER_ART and hashlib.sha256(data).hexdigest() == LAUNCHER_ART[name]
     if suffix in BINARY_SUFFIXES and name != 'runtime/totk.ico' and not reviewed_screenshot and not reviewed_art:
         raise ValueError(f'Binary, log or unreviewed artwork: {name}')
