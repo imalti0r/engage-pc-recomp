@@ -40,6 +40,7 @@ class Launcher:
         self.status = tk.StringVar(value='All changes apply on next launch' if dest else 'Choose your game folder, or open Setup / Update to install.')
         self.location = tk.StringVar()
         self.setting_vars, self.settings_loaded, self.mod_rows = {}, {}, {}
+        self.icon_stamp = None
         root.title('Engage PC Recomp')
         root.geometry('1120x710')
         root.minsize(980, 650)
@@ -200,13 +201,23 @@ class Launcher:
 
     def build_mods(self):
         page = self.pages['mods']
-        self.heading(page, 'RomFS mods', 'First folder alphabetically wins when files overlap. Extracted emulator RomFS mods are supported; code patches and Cobalt plugins are not.')
+        self.heading(page, 'Your mods', 'RomFS mods are supported. Cobalt plugins and code patches are not available yet.')
+        toolbar = ttk.Frame(page)
+        toolbar.pack(fill='x', pady=(8, 14))
+        self.mod_search = tk.StringVar()
+        ttk.Label(toolbar, text='Search').pack(side='left', padx=(0, 8))
+        ttk.Entry(toolbar, textvariable=self.mod_search, width=28).pack(side='left', fill='x', expand=True)
+        self.mod_filter = tk.StringVar(value='All mods')
+        ttk.Combobox(toolbar, textvariable=self.mod_filter, state='readonly', width=17,
+                     values=('All mods', 'Enabled', 'Disabled', 'Needs attention')).pack(side='left', padx=(12, 0))
+        self.mod_summary = tk.StringVar()
+        ttk.Label(page, textvariable=self.mod_summary, style='Muted.TLabel').pack(anchor='w', pady=(0, 10))
         listing = ttk.Frame(page)
         listing.pack(fill='both', expand=True)
-        self.mods = ttk.Treeview(listing, columns=('enabled', 'files', 'conflicts'), show='tree headings', height=6, selectmode='browse')
-        self.mods.heading('#0', text='Mod folder')
+        self.mods = ttk.Treeview(listing, columns=('enabled', 'files', 'conflicts'), show='tree headings', height=4, selectmode='browse')
+        self.mods.heading('#0', text='Mod')
         self.mods.column('#0', width=260, minwidth=130)
-        for key, title, width in [('enabled', 'State', 80), ('files', 'Files', 60), ('conflicts', 'Overridden', 90)]:
+        for key, title, width in [('enabled', 'Status', 130), ('files', 'Files', 65), ('conflicts', 'Overlaps', 85)]:
             self.mods.heading(key, text=title)
             self.mods.column(key, width=width, minwidth=55, stretch=False)
         scroll = ttk.Scrollbar(listing, orient='vertical', command=self.mods.yview)
@@ -215,7 +226,10 @@ class Launcher:
         scroll.pack(side='right', fill='y')
         self.mods.bind('<<TreeviewSelect>>', self.mod_selected)
         self.mods.bind('<space>', lambda _: self.toggle_mod())
-        self.mod_note = tk.StringVar(value='No mods yet. Import a ZIP or an extracted mod folder.')
+        self.mod_title = tk.StringVar(value='Select a mod')
+        ttk.Separator(page).pack(fill='x', pady=(16, 12))
+        ttk.Label(page, textvariable=self.mod_title, font=(self.ui_font, 14)).pack(anchor='w')
+        self.mod_note = tk.StringVar(value='Import a ZIP or an extracted mod folder to get started.')
         ttk.Label(page, textvariable=self.mod_note, wraplength=650, style='Muted.TLabel').pack(anchor='w', pady=12)
         actions = ttk.Frame(page)
         actions.pack(fill='x')
@@ -225,8 +239,10 @@ class Launcher:
         self.zip_button.pack(side='left', padx=8)
         self.folder_button = ttk.Button(actions, text='Import folder', command=lambda: self.import_mod(True))
         self.folder_button.pack(side='left')
-        self.open_mods_button = ttk.Button(page, text='Open mods folder', command=lambda: self.open_folder('mods'))
-        self.open_mods_button.pack(anchor='w', pady=(10, 0))
+        self.open_mods_button = ttk.Button(actions, text='Open mods folder', command=lambda: self.open_folder('mods'))
+        self.open_mods_button.pack(side='right')
+        self.mod_search.trace_add('write', lambda *_: self.render_mods())
+        self.mod_filter.trace_add('write', lambda *_: self.render_mods())
 
     def build_saves(self):
         page = self.pages['saves']
@@ -297,6 +313,7 @@ class Launcher:
             self.status.set(str(error))
 
     def refresh(self):
+        self.refresh_icon()
         try:
             values = ops.read_settings(self.dest) if self.dest else {}
             for key, (_, _, default, choices) in ops.SETTINGS.items():
@@ -305,20 +322,34 @@ class Launcher:
                 label = choices.get(value, value)
                 self.setting_vars[key].set(label)
                 self.setting_widgets[list(ops.SETTINGS).index(key)].configure(values=list(choices.values()) + ([] if value in choices else [value]))
-            self.mods.delete(*self.mods.get_children())
+            selection = self.mods.selection()
+            selected_name = self.mod_rows[selection[0]].name if selection and selection[0] in self.mod_rows else None
             self.mod_rows = {}
             for i, mod in enumerate(ops.list_mods(self.dest) if self.dest else []):
                 key = str(i)
                 self.mod_rows[key] = mod
-                self.mods.insert('', 'end', iid=key, text=mod.name,
-                                 values=('Unsupported' if mod.problem else 'On' if mod.enabled else 'Off', mod.files, mod.conflicts))
-            self.mod_note.set('Select a mod to view details or enable/disable it.' if self.mod_rows else 'No mods yet. Import a ZIP or an extracted mod folder.')
+            self.render_mods(selected_name)
             self.saves_note.set('Saves found in profile/save.' if self.dest and (self.dest / 'profile/save').is_dir() else 'No saves found yet. Save once in-game to create them.')
         except (OSError, ValueError) as error:
             self.status.set(str(error))
         self.location.set(str(self.dest) if self.dest else 'No game folder selected')
         self.home.set_summary(self.settings_loaded, list(self.mod_rows.values()))
         self.update_states()
+
+    def refresh_icon(self):
+        if os.name != 'nt':
+            return
+        icons = ([self.dest / 'engage.ico'] if self.dest else []) + [self.layout.runtime / 'engage-setup.ico']
+        for icon in icons:
+            try:
+                stat = icon.stat()
+                stamp = str(icon), stat.st_mtime_ns, stat.st_size
+                if stamp != self.icon_stamp:
+                    self.root.iconbitmap(str(icon))
+                    self.icon_stamp = stamp
+                return
+            except (OSError, tk.TclError):
+                continue
 
     def update_states(self):
         ready, running = self.installed(), self.game_alive()
@@ -340,6 +371,9 @@ class Launcher:
             widget.configure(state='normal' if ready and not self.busy else 'disabled')
         for widget in (self.choose_button, self.setup_button, self.refresh_button):
             widget.configure(state='disabled' if running or self.busy else 'normal')
+        selection = self.mods.selection()
+        if not selection or self.mod_rows[selection[0]].problem:
+            self.toggle_button.configure(state='disabled')
 
     def choose(self):
         path = filedialog.askdirectory(parent=self.root, title='Choose the folder containing engage.exe')
@@ -361,7 +395,7 @@ class Launcher:
 
     def play(self):
         def start():
-            self.game = subprocess.Popen([str(self.dest / 'engage.exe')], cwd=self.dest)
+            self.game = ops.launch_game(self.dest)
             self.status.set('Game started. Settings, mods and save backups unlock after it exits.')
             self.update_states()
         self.guarded(start)
@@ -485,8 +519,41 @@ class Launcher:
         selection = self.mods.selection()
         if selection:
             m = self.mod_rows[selection[0]]
+            self.mod_title.set(m.name)
+            self.toggle_button.configure(text='Disable mod' if m.enabled else 'Enable mod')
+            self.toggle_button.configure(state='normal' if self.installed() and not self.game_alive() and not self.busy and not m.problem else 'disabled')
             self.mod_note.set(m.problem or (f'{m.files} files · {m.conflicts} overridden by earlier mods.' +
-                              (' Contains executable patches: those patches will be ignored.' if m.code else '')))
+                              (' Contains executable patches: those patches will be ignored.' if m.code else '') +
+                              '\nChanges apply on the next launch.'))
+            if m.problem:
+                self.toggle_button.configure(state='disabled')
+        else:
+            self.mod_title.set('Select a mod' if self.mod_rows else 'Build your collection')
+            self.mod_note.set('Select a mod to see its files, conflicts and compatibility.' if self.mod_rows else
+                              'Import a ZIP or an extracted mod folder to get started.')
+            self.toggle_button.configure(state='disabled')
+
+    def render_mods(self, preferred=None):
+        selected = self.mods.selection()
+        name = preferred or (self.mod_rows[selected[0]].name if selected and selected[0] in self.mod_rows else None)
+        self.mods.delete(*self.mods.get_children())
+        query, mode = self.mod_search.get().casefold(), self.mod_filter.get()
+        enabled = sum(m.enabled and not m.problem for m in self.mod_rows.values())
+        attention = sum(bool(m.problem or m.conflicts) for m in self.mod_rows.values())
+        self.mod_summary.set(f'{len(self.mod_rows)} installed    ·    {enabled} enabled    ·    {attention} need attention')
+        for key, m in self.mod_rows.items():
+            if query not in m.name.casefold() or (mode == 'Enabled' and (not m.enabled or m.problem)) or \
+               (mode == 'Disabled' and (m.enabled or m.problem)) or \
+               (mode == 'Needs attention' and not (m.problem or m.conflicts)):
+                continue
+            self.mods.insert('', 'end', iid=key, text=m.name,
+                             values=('Unavailable' if m.problem else 'Enabled' if m.enabled else 'Disabled', m.files, m.conflicts or '—'))
+            if m.name == name:
+                self.mods.selection_set(key)
+        self.mod_selected()
+        if self.mod_rows and not self.mods.get_children():
+            self.mod_title.set('No matching mods')
+            self.mod_note.set('Try another search or choose All mods.')
 
     def toggle_mod(self):
         def toggle():

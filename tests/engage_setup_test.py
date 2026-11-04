@@ -16,6 +16,20 @@ from installer.guilogic import STEP_ORDER
 
 
 class SetupTest(unittest.TestCase):
+    def test_extraction_failure_reason_reaches_setup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            pipeline = Pipeline(Form(dest=temp), SimpleNamespace(root=root), Reporter(out=io.StringIO()))
+            pipeline.work.mkdir()
+            pipeline.step = 'extract'
+            reason = 'Base game: the selected file contains DLC. Select the Engage base game NSP/XCI.'
+            child = SimpleNamespace(stdout=iter(['progress\n', f'ENGAGE_SETUP_ERROR: {reason}\n']),
+                                    wait=lambda **kwargs: 1, poll=lambda: 1)
+            with patch('engage_setup.pipeline.subprocess.Popen', return_value=child):
+                with self.assertRaises(ValueError) as error:
+                    pipeline.command(['synthetic-extractor'])
+            self.assertEqual(str(error.exception), reason)
+
     def test_form_requires_firmware_and_accepts_optional_dlcs(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

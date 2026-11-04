@@ -17,7 +17,8 @@ The installer opens in its own window and retains its existing input validation,
 progress, recovery and update behavior. After setup finishes, **Play Engage**
 returns to the launcher and starts the game.
 
-The launcher stays open while the game runs. Settings, mod changes and save
+Play requests foreground focus for the game while the launcher stays open behind
+it. Settings, mod changes and save
 backups are blocked until it exits. A game started separately must also be closed
 before these actions. The executable can still be started directly.
 
@@ -42,6 +43,15 @@ remembered installation. Cached extraction/generated code are reused when valid;
 a code change may require a local rebuild. If inputs/cache are missing, Setup
 asks for the required files. Saves, mods and settings are retained by that pipeline.
 Updates from source checkouts remain a Git operation.
+
+## Local game icon
+
+The setup/launcher download and public runtime embed only the original host E
+icon. Setup converts `icon.jpg` from the player's extracted control data into
+`engage.ico` beside the installed game. The running game and launcher load that
+local icon for their windows/taskbar; the launcher falls back to its host icon
+until an installation is selected. No extracted icon is copied into the setup
+bundle or public executable. The executable file's own Explorer icon stays generic.
 
 ## Settings and saves
 
@@ -76,6 +86,11 @@ Mods replace or add whole files without changing `romfs.bin`. No custom manifest
 is needed. The first folder alphabetically wins when enabled mods provide the same
 file. Paths retain their case. The launcher reports overridden files; the in-game
 F1 Mods tab also reports loaded replacements and additions.
+
+The launcher Mods page includes name search and filters for enabled, disabled and
+attention-needed mods. Select a row for compatibility and file-overlap details.
+Unsupported mods cannot be toggled. The F1 Mods page groups mods by what is active
+in the current session; toggles show a restart notice until the next launch.
 
 Toggle a mod in the launcher before Play, or in the F1 Mods tab and restart the
 game. Files must stay unchanged during a session; a changed file requires a

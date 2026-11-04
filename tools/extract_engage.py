@@ -17,9 +17,13 @@ LOGS = ROOT / 'build' / 'engage-v200' / 'logs'
 
 
 def run_tool(keys, arguments, name, title_keys=None):
+    environment = dict(os.environ)
+    environment.pop('ENGAGE_TITLE_KEYS', None)
+    if title_keys is not None and str(title_keys).strip():
+        environment['ENGAGE_TITLE_KEYS'] = str(title_keys)
     result = subprocess.run([str(TOOL), str(keys), *map(str, arguments)],
                             capture_output=True, encoding='utf-8', errors='replace',
-                            env=dict(os.environ, ENGAGE_TITLE_KEYS=str(title_keys) if title_keys else ''))
+                            env=environment)
     # External tools must not persist or display possible key-sized values.
     output = re.sub(r'[0-9a-fA-F]{32,}', '<hex removed>', result.stdout + result.stderr)
     LOGS.mkdir(parents=True, exist_ok=True)
@@ -32,7 +36,28 @@ def run_tool(keys, arguments, name, title_keys=None):
 def check_content(output, kind, title, version):
     entries = re.findall(r'^content (\w+) ([0-9a-fA-F]{16}) (\d+)\s*$', output, re.M)
     if [(k, t.lower(), int(v)) for k, t, v in entries] != [(kind, title.lower(), version)]:
-        raise ValueError(f'Expected exactly {kind} {title} version {version}; package identity differs')
+        field, expected = {
+            'Application': ('Base game', 'the Fire Emblem Engage base game NSP/XCI'),
+            'Patch': ('Update', 'the Fire Emblem Engage 2.0.0 update NSP'),
+            'AddOnContent': ('DLC', f'the Engage DLC package with title ID {title}'),
+        }[kind]
+        found = ', '.join({'Application': 'a base game', 'Patch': 'an update',
+                           'AddOnContent': 'DLC'}.get(k, k) + f' ({t}, version {v})'
+                          for k, t, v in entries) or 'no recognized game content'
+        raise ValueError(f'{field}: the selected file contains {found}. Select {expected} in the {field} field. '
+                         'DLC belongs in the optional DLC fields; combined packages are not supported.')
+
+
+def input_path(data, name, optional=False):
+    value = data.get(name)
+    if optional and (value is None or isinstance(value, str) and not value.strip()):
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f'Missing or invalid input.{name}: set it to a file path in the config or select the file in Setup')
+    path = Path(value)
+    if not path.is_file():
+        raise ValueError(f'Configured input.{name} file is missing or inaccessible; select an existing file')
+    return path
 
 
 def main():
@@ -45,9 +70,13 @@ def main():
     args = parser.parse_args()
     TOOL, OUT, LOGS = args.tool, args.out, args.logs
     try:
-        data = tomllib.loads(args.config.read_text(encoding='utf-8'))['input']
-        keys, base, update = (Path(data[name]) for name in ('keys', 'base', 'update'))
-        title_keys = Path(data['title_keys']) if data.get('title_keys') else None
+        data = tomllib.loads(args.config.read_text(encoding='utf-8')).get('input')
+        if not isinstance(data, dict):
+            raise ValueError('Invalid input table: add [input] with keys, base and update file paths')
+        keys, base, update = (input_path(data, name) for name in ('keys', 'base', 'update'))
+        title_keys = input_path(data, 'title_keys', optional=True)
+        if not isinstance(data.get('dlc', {}), dict):
+            raise ValueError('Invalid input.dlc: use a table of DLC title IDs and file paths')
         dlcs = {title.lower(): Path(path) for title, path in data.get('dlc', {}).items()}
         if not set(dlcs).issubset(DLC_SPECS):
             raise ValueError('The config contains an unsupported DLC title ID')
@@ -79,8 +108,9 @@ def main():
         (OUT / 'inputs.json').write_text(
             json.dumps(report, indent=2) + '\n', encoding='utf-8')
         print(f'Verified Engage 2.0.0 and extracted {len(dlcs)} DLC packages.')
-    except (OSError, ValueError, KeyError) as error:
-        parser.exit(1, f'{error}\n')
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        message = re.sub(r'[0-9a-fA-F]{32,}', '<hex removed>', str(error)).replace('\n', ' ')
+        parser.exit(1, f'ENGAGE_SETUP_ERROR: {message}\n')
 
 
 if __name__ == '__main__':

@@ -917,10 +917,19 @@ static void tab_mods(float scale) {
     if (opt_button("##mods_folder", UI_MENU_MODS_OPEN, UI_MENU_MODS_HELP))
         plat_open_folder(mods_directory());
     if (!mods_count()) opt_text(UI_MENU_MODS_EMPTY);
-    for (int i = 0; i < mods_count(); i++) {
+    for (int group = 0; group < 3; group++) {
+      bool heading = false;
+      for (int i = 0; i < mods_count(); i++) {
         ModInfo m;
         if (!mods_get(i, &m)) continue;
-        char id[48], desc[UI_DESC_BYTES], stats[256];
+        int section = !m.supported ? 2 : m.active ? 0 : 1;
+        if (section != group) continue;
+        if (!heading) {
+            const UiTextId titles[] = {UI_MENU_MODS_ENABLED, UI_MENU_MODS_DISABLED, UI_MENU_MODS_UNAVAILABLE};
+            opt_group(titles[group]);
+            heading = true;
+        }
+        char id[48], desc[UI_DESC_BYTES], stats[256], note[160];
         snprintf(id, sizeof id, "##mod_%d", i);
         snprintf(stats, sizeof stats, menu_text(UI_MENU_MODS_STATS), m.files, m.replaced, m.added, m.shadowed);
         snprintf(desc, sizeof desc, "%s\n\n%s\n\n%s%s%s\n\n%s", m.name, stats, m.problem,
@@ -929,11 +938,13 @@ static void tab_mods(float scale) {
         if (!m.supported) opt_disable_next(UI_MENU_MODS_UNSUPPORTED);
         else if (cfg_from_env("TOTK_MODS_DISABLED")) opt_disable_next(UI_MENU_SET_BY_ENV);
         bool on = m.enabled;
+        snprintf(note, sizeof note, menu_text(m.shadowed ? UI_MENU_MODS_OVERLAPS : UI_MENU_MODS_ROW), m.files, m.shadowed);
         if (opt_named_toggle(id, m.name, desc, &on,
-                             m.enabled != m.active ? menu_text(UI_MENU_MODS_RESTART) : nullptr)) {
+                             m.enabled != m.active ? menu_text(UI_MENU_MODS_RESTART) : m.supported ? note : menu_text(UI_MENU_MODS_UNSUPPORTED))) {
             mods_set_enabled(i, on);
             opt_save_soon();
         }
+      }
     }
     opt_end();
 }

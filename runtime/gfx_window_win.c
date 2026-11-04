@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 #include <windows.h>
 #include <imm.h>
 
@@ -279,26 +280,40 @@ static LRESULT CALLBACK wnd_proc(HWND h, UINT m, WPARAM w, LPARAM l) {
     return DefWindowProcW(h, m, w, l);
 }
 
+static HICON window_icon(HINSTANCE inst, int width, int height) {
+    if (RT_ENGAGE) {
+        wchar_t path[32768];
+        DWORD count = GetModuleFileNameW(NULL, path, sizeof path / sizeof *path);
+        if (count && count < sizeof path / sizeof *path) {
+            wchar_t *sep = wcsrchr(path, L'\\');
+            if (sep && sep - path + 12 < sizeof path / sizeof *path) {
+                wcscpy(sep + 1, L"engage.ico");
+                HICON icon = LoadImageW(NULL, path, IMAGE_ICON, width, height, LR_LOADFROMFILE);
+                if (icon) return icon;  // Retained for the registered window class's process lifetime.
+            }
+        }
+    }
+    return LoadImageW(inst, MAKEINTRESOURCEW(1), IMAGE_ICON, width, height, LR_SHARED);
+}
+
 static void window_main(void *arg) {
     (void)arg;
     HINSTANCE inst = GetModuleHandleW(NULL);
-    // Icon resource 1 of totk.rc (runtime/totk.ico): the title bar, the taskbar button and Alt+Tab.
+    // A player's local icon is optional; distributed executables retain the original host icon.
     WNDCLASSEXW wc = {.cbSize = sizeof wc, .lpfnWndProc = wnd_proc, .hInstance = inst,
-                      .hIcon = LoadImageW(inst, MAKEINTRESOURCEW(1), IMAGE_ICON, GetSystemMetrics(SM_CXICON),
-                                          GetSystemMetrics(SM_CYICON), LR_SHARED),
-                      .hIconSm = LoadImageW(inst, MAKEINTRESOURCEW(1), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON),
-                                            GetSystemMetrics(SM_CYSMICON), LR_SHARED),
+                      .hIcon = window_icon(inst, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON)),
+                      .hIconSm = window_icon(inst, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON)),
                       .hCursor = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW), .lpszClassName = RT_ENGAGE ? L"EngagePCRecompWindow" : L"TotKRecompWindow"};
     RegisterClassExW(&wc);
     int cw, ch, ow, oh;
     cfg_window_size(&cw, &ch);
     outer_size(NULL, cw, ch, &ow, &oh);
-    // The window opens behind the user's windows without taking focus: it shows the game's blank loading frames for a
-    // while, and must not cover what the player works on meanwhile. The game still counts itself in focus until the
-    // first WM_ACTIVATEAPP, so loading goes on, and keyboard input waits for the foreground (input_win.c). Its taskbar
-    // button flashes until it is brought up, and TOTK_FULLSCREEN waits for that first activation.
+    // Direct starts load quietly behind other windows. The launcher's Play action explicitly requests activation;
+    // the parent grants its child foreground permission before this window is created.
     // TOTK_BACKGROUND_WINDOW=1 (test runs): no flashing, never fullscreen at start, and F11 keeps the window's place.
     int background = g_background = cfg_get("TOTK_BACKGROUND_WINDOW") && atoi(cfg_get("TOTK_BACKGROUND_WINDOW"));
+    const char *front = cfg_get("TOTK_LAUNCH_FOREGROUND");
+    int foreground = RT_ENGAGE && !background && front && atoi(front);
     g_hwnd = CreateWindowExW(0, wc.lpszClassName, RT_ENGAGE ? L"Engage PC Recomp" : L"TotK Recomp", WND_STYLE, CW_USEDEFAULT, CW_USEDEFAULT, ow, oh, NULL,
                              NULL, inst, NULL);
     if (!g_hwnd) {
@@ -313,11 +328,14 @@ static void window_main(void *arg) {
         // The frame was measured at the system DPI; the window may have opened on a monitor at another scale.
         plat_xchg32(&g_dpi, (int32_t)GetDpiForWindow(g_hwnd));
         outer_size(g_hwnd, cw, ch, &ow, &oh);
-        SetWindowPos(g_hwnd, HWND_BOTTOM, 0, 0, ow, oh, SWP_NOMOVE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
-        if (!background) {
+        g_fs_pending = !background && cfg_fullscreen();
+        SetWindowPos(g_hwnd, foreground ? HWND_TOP : HWND_BOTTOM, 0, 0, ow, oh,
+                     SWP_NOMOVE | SWP_SHOWWINDOW | (foreground ? 0 : SWP_NOACTIVATE));
+        if (foreground) {
+            SetForegroundWindow(g_hwnd);
+        } else if (!background) {
             FLASHWINFO fw = {.cbSize = sizeof fw, .hwnd = g_hwnd, .dwFlags = FLASHW_TRAY | FLASHW_TIMERNOFG};
             FlashWindowEx(&fw);
-            g_fs_pending = cfg_fullscreen();
         }
         note_applied();
         refresh_rate_update(g_hwnd, 1);

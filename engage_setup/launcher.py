@@ -5,6 +5,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import subprocess
 import stat
 import tempfile
 import zipfile
@@ -26,6 +27,19 @@ LINE = re.compile(r'^\s*(?:totk_)?([a-z0-9_]+)\s*=\s*(.*?)\s*$', re.I)
 
 def version_label(version, channel):
     return ('DEV · ' if channel == 'dev' else 'v') + version.removeprefix('v')
+
+
+def launch_game(dest):
+    dest = Path(dest)
+    process = subprocess.Popen([str(dest / 'engage.exe')], cwd=dest,
+                               env=dict(os.environ, TOTK_LAUNCH_FOREGROUND='1'))
+    if os.name == 'nt':
+        import ctypes
+        from ctypes import wintypes
+        allow = ctypes.windll.user32.AllowSetForegroundWindow
+        allow.argtypes, allow.restype = [wintypes.DWORD], wintypes.BOOL
+        allow(process.pid)
+    return process
 
 
 def read_settings(dest):

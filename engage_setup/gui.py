@@ -71,7 +71,8 @@ class App(BaseApp):
         from pathlib import Path
         dest = Path(self.model.dest)
         try:
-            subprocess.Popen([str(dest / 'engage.exe')], cwd=dest)
+            from .launcher import launch_game
+            launch_game(dest)
         except OSError as error:
             messagebox.showerror('Engage could not start', str(error), parent=self.root)
 

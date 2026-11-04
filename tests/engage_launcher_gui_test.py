@@ -47,9 +47,43 @@ class LauncherGuiTest(unittest.TestCase):
             self.app.save_settings_button.invoke()
             self.assertEqual(read_settings(self.dest)['volume'], '50')
             self.app.mods.selection_set('0')
+            self.app.mod_selected()
             self.app.toggle_button.invoke()
             self.assertEqual(read_settings(self.dest)['mods_disabled'], 'Test'.encode().hex())
             self.assertEqual(self.app.home.mod_count.get(), '0 enabled')
+
+    def test_mod_search_filters_and_running_lock(self):
+        from engage_setup.launcher import set_mod_enabled
+        optional = self.dest / 'mods/Optional/romfs/file'
+        optional.parent.mkdir(parents=True)
+        optional.write_bytes(b'optional')
+        unsupported = self.dest / 'mods/Unsupported'
+        unsupported.mkdir()
+        (unsupported / 'exefs').mkdir()
+        set_mod_enabled(self.dest, 'Optional', False)
+        self.app.refresh()
+        self.assertIn('3 installed', self.app.mod_summary.get())
+        self.app.mod_filter.set('Enabled')
+        self.assertEqual([self.app.mods.item(k, 'text') for k in self.app.mods.get_children()], ['Test'])
+        self.app.mod_filter.set('Disabled')
+        self.assertEqual([self.app.mods.item(k, 'text') for k in self.app.mods.get_children()], ['Optional'])
+        self.app.mod_filter.set('Needs attention')
+        key, = self.app.mods.get_children()
+        self.app.mods.selection_set(key)
+        self.app.mod_selected()
+        self.assertEqual(str(self.app.toggle_button['state']), 'disabled')
+        self.assertIn('Code-only mod', self.app.mod_note.get())
+        self.app.mod_filter.set('All mods')
+        self.app.mod_search.set('TEST')
+        key, = self.app.mods.get_children()
+        self.app.mods.selection_set(key)
+        self.app.mod_selected()
+        self.assertEqual(self.app.toggle_button['text'], 'Disable mod')
+        with patch.object(self.app, 'game_alive', return_value=True):
+            self.app.mod_selected()
+            self.assertEqual(str(self.app.toggle_button['state']), 'disabled')
+        self.app.mod_search.set('nothing matches')
+        self.assertEqual(self.app.mod_title.get(), 'No matching mods')
 
     def test_first_launch_offers_existing_install_or_setup(self):
         self.app.dest = None
@@ -62,6 +96,33 @@ class LauncherGuiTest(unittest.TestCase):
             self.app.setup_existing_button.invoke()
         self.assertEqual(self.app.current_page, 'play')
         self.assertEqual(self.app.play_button['text'], 'Play Engage')
+
+    def test_extracted_icon_stays_local_and_is_used_by_launcher(self):
+        import ctypes
+        from ctypes import wintypes
+        from PIL import Image
+        from engage_setup.game_icon import prepare_icon
+        self.root.attributes('-alpha', 0)
+        self.root.deiconify()
+        self.root.update()
+        user = ctypes.windll.user32
+        user.GetParent.argtypes, user.GetParent.restype = [wintypes.HWND], wintypes.HWND
+        user.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        user.SendMessageW.restype = ctypes.c_void_p
+        window = user.GetParent(self.root.winfo_id())
+        before_icon = user.SendMessageW(window, 0x007f, 1, 0)  # WM_GETICON, ICON_BIG
+        source = self.dest / 'icon.jpg'
+        Image.new('RGB', (256, 256), '#3060a0').save(source)
+        icon = self.dest / 'engage.ico'
+        self.assertTrue(prepare_icon(source, icon))
+        self.assertEqual(icon.read_bytes()[:4], b'\x00\x00\x01\x00')
+        self.app.refresh_icon()
+        self.assertEqual(self.app.icon_stamp[0], str(icon))
+        self.assertNotEqual(user.SendMessageW(window, 0x007f, 1, 0), before_icon)
+        before = icon.read_bytes()
+        source.write_bytes(b'not an image')
+        self.assertFalse(prepare_icon(source, icon))
+        self.assertEqual(icon.read_bytes(), before)
 
     def test_running_game_blocks_changes_and_launcher_remains_open(self):
         from engage_setup.launcher import read_settings
@@ -77,6 +138,18 @@ class LauncherGuiTest(unittest.TestCase):
         self.app.toggle_mod()
         self.assertNotIn('mods_disabled', read_settings(self.dest))
         self.assertTrue(self.root.winfo_exists())
+
+    def test_play_requests_foreground_for_the_child_without_changing_parent_environment(self):
+        from types import SimpleNamespace
+        previous = os.environ.get('TOTK_LAUNCH_FOREGROUND')
+        child = SimpleNamespace(pid=12345, poll=lambda: None)
+        with patch.object(self.app, 'require_idle'), \
+             patch('engage_setup.launcher_gui.subprocess.Popen', return_value=child) as start, \
+             patch('ctypes.windll.user32.AllowSetForegroundWindow', return_value=True) as allow:
+            self.app.play()
+        self.assertEqual(start.call_args.kwargs['env']['TOTK_LAUNCH_FOREGROUND'], '1')
+        self.assertEqual(os.environ.get('TOTK_LAUNCH_FOREGROUND'), previous)
+        allow.assert_called_once_with(child.pid)
 
     def test_backup_action_copies_saves_and_setup_opens_from_same_launcher(self):
         with patch.object(self.app, 'require_idle'):
