@@ -96,11 +96,7 @@ class Launcher:
         nav.grid(row=0, column=1)
         from .launcher_controls import Button
         Button(header, text='Settings', icon='settings', width=125, height=34,
-               command=lambda: self.show('settings')).grid(row=0, column=2, sticky='e', padx=(0, 60))
-        controls = ttk.Frame(header)
-        controls.grid(row=0, column=3, sticky='e')
-        from .launcher_chrome import Chrome
-        self.chrome = Chrome(root, header, controls, self.close)
+               command=lambda: self.show('settings')).grid(row=0, column=2, sticky='e')
         ttk.Separator(outer).pack(fill='x')
         footer = ttk.Frame(outer, padding=(28, 14), height=65)
         footer.pack(side='bottom', fill='x')
@@ -163,10 +159,6 @@ class Launcher:
         for pending in self.after_ids:
             self.root.after_cancel(pending)
         self.after_ids.clear()
-        chrome = getattr(self, 'chrome', None)
-        if chrome and chrome.pending:
-            self.root.after_cancel(chrome.pending)
-            chrome.pending = None
 
     def heading(self, page, title, description):
         ttk.Label(page, text=title, style='LauncherHeading.TLabel').pack(anchor='w')

@@ -132,24 +132,6 @@ class LauncherGuiTest(unittest.TestCase):
         self.assertEqual(str(self.app.play_button['state']), 'normal')
         self.assertIn('Could not check', self.app.status.get())
 
-    def test_window_controls_keep_native_minimize_maximize_and_restore(self):
-        self.root.attributes('-alpha', 0)
-        self.root.deiconify()
-        self.root.update()
-        self.app.chrome.install()
-        self.app.chrome.maximize()
-        self.root.update()
-        self.assertEqual(self.root.state(), 'zoomed')
-        self.app.chrome.maximize()
-        self.root.update()
-        self.assertEqual(self.root.state(), 'normal')
-        self.app.chrome.minimize()
-        self.root.update()
-        self.assertEqual(self.root.state(), 'iconic')
-        self.root.deiconify()
-        self.root.update()
-        self.assertEqual(self.root.state(), 'normal')
-
 
 if __name__ == '__main__':
     unittest.main()
