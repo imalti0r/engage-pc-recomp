@@ -88,8 +88,7 @@ class Launcher:
         header = ttk.Frame(outer, padding=(26, 4), height=57)
         header.pack(fill='x')
         header.grid_propagate(False)
-        header.columnconfigure(0, weight=2)
-        header.columnconfigure(2, weight=1)
+        header.columnconfigure((0, 2), weight=1, uniform='header-sides')
         from .launcher_controls import Pill
         Pill(header, ops.version_label(layout.release, getattr(layout, 'channel', 'dev'))).grid(row=0, column=0, sticky='w')
         nav = ttk.Frame(header)
