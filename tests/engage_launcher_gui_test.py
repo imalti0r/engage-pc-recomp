@@ -39,7 +39,7 @@ class LauncherGuiTest(unittest.TestCase):
         from engage_setup.launcher_gui import Launcher
         from engage_setup.model import layout
         self.temp = tempfile.TemporaryDirectory()
-        self.dest = Path(self.temp.name)
+        self.dest = Path(self.temp.name).resolve()
         for name in ('engage.exe', 'romfs-index.bin'):
             (self.dest / name).write_bytes(b'synthetic fixture')
         mod = self.dest / 'mods/Test/romfs/file'

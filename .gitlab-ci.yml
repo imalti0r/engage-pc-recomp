@@ -25,6 +25,7 @@ setup-window:
     - python -m pip install Pillow==13.0.0
   script:
     - python -m unittest discover -s tests -p "engage_setup_test.py"
+    - python -m unittest discover -s tests -p "engage_installed_launcher_test.py"
     - python -m unittest discover -s tests -p "engage_launcher_gui_test.py"
     - python -m engage_setup.gui --selftest
     - python -m engage_setup.gui --setup --selftest

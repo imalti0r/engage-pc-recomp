@@ -20,7 +20,7 @@ from installer.guilogic import STEP_ORDER
 class InstalledLauncherTest(unittest.TestCase):
     def test_setup_retries_launcher_copy_before_reporting_success(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
+            root = Path(temp).resolve()
             source = root / 'download'
             self.package(source)
             dest = self.game(root / 'game')
@@ -60,7 +60,7 @@ class InstalledLauncherTest(unittest.TestCase):
 
     def test_installed_tools_survive_download_removal_and_game_folder_move(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
+            root = Path(temp).resolve()
             source = root / 'download'
             self.package(source)
             # An unlisted private file must never be copied into the installed tools.
@@ -83,7 +83,7 @@ class InstalledLauncherTest(unittest.TestCase):
 
     def test_update_keeps_running_package_and_rejects_corruption_before_switching(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
+            root = Path(temp).resolve()
             source = root / 'download'
             self.package(source)
             dest = self.game(root / 'game')
@@ -103,7 +103,7 @@ class InstalledLauncherTest(unittest.TestCase):
 
     def test_inventory_cannot_escape_package(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
+            root = Path(temp).resolve()
             source = root / 'download'
             self.package(source)
             for name in ('../private', '/outside', 'C:/outside', '..\\outside'):
