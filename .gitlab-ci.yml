@@ -22,9 +22,13 @@ setup-window:
   before_script:
     - choco install python --version=3.14.0 -y --no-progress
     - $env:Path = [Environment]::GetEnvironmentVariable("Path","Machine")
+    - python -m pip install Pillow==13.0.0
   script:
     - python -m unittest discover -s tests -p "engage_setup_test.py"
+    - python -m unittest discover -s tests -p "engage_installed_launcher_test.py"
+    - python -m unittest discover -s tests -p "engage_launcher_gui_test.py"
     - python -m engage_setup.gui --selftest
+    - python -m engage_setup.gui --setup --selftest
 
 audit-source-release:
   stage: release

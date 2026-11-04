@@ -24,7 +24,15 @@
 #include "cfg.h"
 #include "fs.h"
 #include "host.h"
+#include "mods.h"
+#ifdef RT_GAME_LIBRARY
+#define ROMFS_IMAGE_SIZE (rt_game_library()->romfs_size)
+#define ROMFS_IMAGE_SHA256 (rt_game_library()->romfs_sha256)
+#define ROMFS_INDEX_SHA256 (rt_game_library()->index_sha256)
+#define ROMFS_FILE_COUNT (rt_game_library()->romfs_files)
+#else
 #include "romfs_config.h"
+#endif
 #include "romfs_path.h"
 #include "platform/platform.h"
 #include "sha256.h"
@@ -125,7 +133,7 @@ static void verify_image(const char *dir) {
     if (pdir && *pdir) dir = pdir;
     RomfsProof want = {0}, saved;
     memcpy(want.magic, "TOTKRFS-PROOF-1", 16);
-    memcpy(want.sha256, ROMFS_IMAGE_SHA256, sizeof ROMFS_IMAGE_SHA256 < 65 ? sizeof ROMFS_IMAGE_SHA256 : 65);
+    snprintf(want.sha256, sizeof want.sha256, "%s", ROMFS_IMAGE_SHA256);
     want.id = identity_of(image);
     char path[2100];
     need(snprintf(path, sizeof path, "%s/.romfs-verified-v1", dir) < (int)sizeof path, "proof path");
@@ -283,6 +291,37 @@ bad:
 #undef BAD
 }
 
+static int mod_overlay(const char *name, const char *path, void *ctx) {
+    size_t legacy = *(size_t *)ctx;
+    uint64_t i = lower(name);
+    int exists = i < file_count && !strcmp(entry_name(entry(i)), name);
+    if (!exists) i = ADDED;
+    PlatFile *f = open_read(path);
+    if (!f) rt_fatal("RomFS mod: cannot open %s; restart after fixing the mod", path);
+    Identity id = identity_of(f);
+    plat_file_close(f);
+    size_t slot = noverlay;
+    for (size_t k = 0; k < legacy; k++)
+        if (!strcmp(overlays[k].name, name)) { slot = k; break; }
+    if (slot == noverlay) {
+        if (noverlay == overlay_cap) {
+            overlay_cap = overlay_cap ? overlay_cap * 2 : 16;
+            overlays = realloc(overlays, overlay_cap * sizeof *overlays);
+            need(overlays != NULL, "mod overlay table");
+        }
+        noverlay++;
+    } else {
+        free(overlays[slot].path);
+        free(overlays[slot].name);
+    }
+    char *host = strdup(path), *relative = strdup(name);
+    need(host && relative, "mod path copy");
+    overlays[slot] = (Overlay){i, id.size, host, relative, id};
+    rt_log("RomFS mod: %s (%llu bytes) %s", name, (unsigned long long)id.size,
+           exists ? "replaces the original" : "is added");
+    return exists ? MOD_FILE_REPLACED : MOD_FILE_ADDED;
+}
+
 static int overlay_order(const void *a, const void *b) {
     uint64_t x = ((const Overlay *)a)->index, y = ((const Overlay *)b)->index;
     return (x > y) - (x < y);
@@ -426,6 +465,10 @@ static void overlay_init(void) {
     const char *dirs[2] = {patches, cfg_get("TOTK_ROMFS_MODS")};
     for (int i = 0; i < 2; i++)
         if (dirs[i] && *dirs[i] && strcmp(dirs[i], "0")) overlay_load(dirs[i], 0);
+    if (RT_ENGAGE) {
+        size_t legacy = noverlay;
+        mods_each_file(mod_overlay, &legacy);
+    }
     heapdef_overlay();
     added_init();
     if (noverlay) qsort(overlays, noverlay, sizeof *overlays, overlay_order);
@@ -493,6 +536,7 @@ static void init_once(void *param) {
 #ifdef ROMFS_MISSING
     rt_fatal("this build has no RomFS: tools/build_game.py found no index.json in its --romfs directory");
 #else
+    if (!ROMFS_IMAGE_SIZE || !ROMFS_FILE_COUNT) rt_fatal("game DLL has no verified RomFS metadata; run setup again");
     double t0 = now_s();
     load_index();
     const char *dir = rt_config()->romfs;

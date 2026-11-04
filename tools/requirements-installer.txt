@@ -5,3 +5,5 @@ lz4==4.4.5
 cryptography==50.0.2
 cffi==2.1.1
 pycparser==3.11
+# The Engage launcher resizes its approved artwork and preserves the title's alpha.
+Pillow==13.0.0

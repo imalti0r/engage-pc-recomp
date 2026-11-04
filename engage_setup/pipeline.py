@@ -35,7 +35,9 @@ def write_json(path, data):
 def validate_destination(dest, inputs, root):
     dest = dest.resolve()
     root = Path(root).resolve()
-    if dest == Path(dest.anchor) or dest == root or root.is_relative_to(dest) or dest.is_relative_to(root):
+    from .installed_launcher import installed_game
+    own_launcher = installed_game(root) == dest
+    if dest == Path(dest.anchor) or dest == root or (root.is_relative_to(dest) and not own_launcher) or dest.is_relative_to(root):
         raise ValueError('Choose a separate install folder outside the setup package.')
     if any(p.resolve() == dest or p.resolve().is_relative_to(dest) or dest.is_relative_to(p.resolve()) for p in inputs):
         raise ValueError('Keep the install folder separate from your input files and firmware.')
@@ -112,14 +114,19 @@ class Pipeline:
         child = subprocess.Popen(list(map(str, arguments)), cwd=self.paths.root, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, encoding='utf-8', errors='replace', creationflags=flags, env=environment)
         # Child shares setup's process group: the existing GUI cancellation controller stops the whole job.
+        failure_reason = None
         try:
             for line in child.stdout:
                 self.reporter.log(redact(line.rstrip()))
+                if line.startswith('ENGAGE_SETUP_ERROR: '):
+                    failure_reason = redact(line.removeprefix('ENGAGE_SETUP_ERROR: ').strip())
                 match = re.search(r'^\[(\d+)/(\d+)\]', line)
                 if match:
                     self.reporter.progress(self.step, 'work', done=int(match[1]), total=int(match[2]), unit='objects')
             code = child.wait(timeout=timeout)
             if code:
+                if failure_reason:
+                    raise ValueError(failure_reason)
                 raise ValueError(f'{self.step.capitalize()} failed (exit {code}). Open the setup log for details.')
         finally:
             if child.poll() is None:
@@ -217,10 +224,14 @@ class Pipeline:
         return self.dest / name if 'romfs' in self.state.get('assets', []) and not work_path.is_dir() else work_path
 
     def compile(self):
+        runtime = self.paths.root / 'bin/engage.exe'
+        prebuilt = ['--runtime-exe', runtime] if runtime.is_file() else []
         self.python('tools/build_engage.py', '--extracted', self.extracted, '--translator', self.paths.xlate.parent,
                     '--gen', self.generated, '--out', self.build, '--romfs', self.deployed_or(self.extracted / 'packed-romfs', 'romfs'),
                     '--profile', self.dest / 'profile', '--toolchain', self.paths.llvm, '--deps', self.paths.deps,
-                    '--ninja', self.paths.ninja, '--runtime', self.paths.runtime, '--jobs', min(8, os.cpu_count() or 1))
+                    '--ninja', self.paths.ninja, '--runtime', self.paths.runtime, '--jobs', min(8, os.cpu_count() or 1),
+                    *prebuilt)
+        self.state['game_library'] = 1
 
     def prepare(self):
         self.reporter.progress('prepare', 'work')
@@ -241,17 +252,57 @@ class Pipeline:
                 write_json(self.dest / 'engage-install.json', self.state)
         for pattern in ('*.dll', 'totk_xlate.*'):
             for source in self.build.glob(pattern):
-                self.deploy(source)
+                if source.name != 'engage_game.dll':
+                    self.deploy(source)
         self.deploy(self.build / 'romfs-index.bin')
+        from .game_icon import prepare_icon
+        prepare_icon(self.extracted / 'icon.jpg', self.dest / 'engage.ico')
         # Never replace the player's settings or profile.
         settings = self.dest / 'engage.ini'
         if not settings.exists():
             settings.write_text(ini.set_language('[graphics]\ngpu = vulkan\nvk_recorder = 0\n\n[system]\nshared_fonts = fonts\n\n', self.form.lang), encoding='utf-8')
-        launcher = '@echo off\ncd /d "%~dp0"\nset TOTK_GPU=vulkan\nset TOTK_VK_RECORDER=0\nset "TOTK_SHARED_FONTS=%~dp0fonts"\nstart "" "%~dp0engage.exe"\n'
+        launcher = '@echo off\n"%~dp0engage.exe" %*\nif errorlevel 1 pause\n'
         (self.dest / 'Play Engage.cmd').write_text(launcher, encoding='utf-8')
-        self.deploy(self.build / 'engage.exe')
+        self.deploy_game()
         with (self.dest / 'engage.exe').open('rb') as stream:
             self.state['exe_sha256'] = hashlib.file_digest(stream, 'sha256').hexdigest()
+        with (self.dest / 'engage_game.dll').open('rb') as stream:
+            self.state['game_dll_sha256'] = hashlib.file_digest(stream, 'sha256').hexdigest()
+        self.state['game_library'] = 1
+
+    def deploy_game(self):
+        """Keep the previous working pair if either replacement fails (including a running game)."""
+        names = ('engage_game.dll', 'engage.exe')
+        for name in names:
+            if not (self.build / name).is_file():
+                raise ValueError(f'Compiled {name} is missing. Retry the compile step.')
+        backup = Path(tempfile.mkdtemp(prefix='.engage-deploy-', dir=self.dest))
+        changed = []
+        keep_backup = False
+        try:
+            for name in names:
+                if (self.dest / name).exists():
+                    shutil.copy2(self.dest / name, backup / name)
+                shutil.copy2(self.build / name, self.dest / (name + '.new'))
+            for name in names:
+                os.replace(self.dest / (name + '.new'), self.dest / name)
+                changed.append(name)
+        except OSError:
+            try:
+                for name in reversed(changed):
+                    if (backup / name).exists():
+                        os.replace(backup / name, self.dest / name)
+                    else:
+                        (self.dest / name).unlink()
+            except OSError:
+                keep_backup = True
+                raise ValueError(f'Close Engage. The previous runtime/game DLL backup is kept in {backup}.') from None
+            raise ValueError('Close Engage before replacing the runtime and game DLL, then retry setup.') from None
+        finally:
+            for name in names:
+                (self.dest / (name + '.new')).unlink(missing_ok=True)
+            if not keep_backup:
+                shutil.rmtree(backup)
 
     def deploy(self, source):
         pending = self.dest / (source.name + '.new')
@@ -276,7 +327,8 @@ class Pipeline:
         with lock_destination(self.dest):
             old = installed_state(self.dest)
             stamp = self.fingerprint()
-            if old and old.get('release') != self.paths.release and old.get('done') == list(STEP_ORDER[1:]):
+            if old and (old.get('release') != self.paths.release or not old.get('game_library')) and \
+                    old.get('done') == list(STEP_ORDER[1:]):
                 # Update: the game data is already extracted and deployed, so only lift, compile and prepare rerun.
                 self.reuse_exefs()
                 # The generated C is kept after an install; it is reused when nothing that feeds the lifter changed.
@@ -302,6 +354,10 @@ class Pipeline:
                 self.state['done'].append(step)
                 write_json(self.dest / 'engage-install.json', self.state)
                 self.reporter.step(step, 'done')
+            if not getattr(self.paths, 'dev', True):
+                self.reporter.log('Installing the launcher and setup tools beside the game…')
+                from .installed_launcher import install_launcher
+                install_launcher(self.paths.root, self.dest)
         self.reporter.emit('end', result='ok', seconds=self.reporter.elapsed())
 
     def reuse_exefs(self):
@@ -321,6 +377,14 @@ class Pipeline:
                 digest = hashlib.file_digest(stream, 'sha256').hexdigest()
             if digest != self.state.get('exe_sha256'):
                 raise ValueError('The installed executable changed. Choose a fresh install folder.')
+            if self.state.get('game_library'):
+                dll = self.dest / 'engage_game.dll'
+                if not dll.is_file():
+                    raise ValueError('The installed game DLL is missing. Run setup to rebuild it.')
+                with dll.open('rb') as stream:
+                    digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+                if digest != self.state.get('game_dll_sha256'):
+                    raise ValueError('The installed game DLL changed. Run setup to rebuild it.')
             self.check_assets(self.dest / 'romfs', self.dest / 'exefs', self.dest / 'fonts')
         elif 'extract' in done:
             self.check_assets(self.extracted / 'packed-romfs', self.extracted / 'ExeFS', self.work / 'fonts',
@@ -329,6 +393,9 @@ class Pipeline:
             raise ValueError('Generated build files are missing. Choose a fresh install folder.')
         if 'compile' in done and 'prepare' not in done and not (self.build / 'engage.exe').is_file():
             raise ValueError('Compiled build files are missing. Choose a fresh install folder.')
+        if 'compile' in done and 'prepare' not in done and self.state.get('game_library') and \
+                not (self.build / 'engage_game.dll').is_file():
+            raise ValueError('Compiled game DLL is missing. Retry the compile step.')
 
     def check_assets(self, packed, exefs, fonts, allow_deployed=False):
         if allow_deployed:

@@ -736,7 +736,7 @@ static void ov_user_difference(Cpu *c) {
 // them from the user's firmware. Each type is read on first use into guest-visible memory as the BFTTF file the pl
 // shared memory holds; Address is 8 bytes past the file start (after the BFTTF header) and Size the decoded font size,
 // as in MNG. The load state is always Loaded: the game spins until it is, so missing files stop with a named fatal at
-// Address/Size instead of a hang. TOTK_SHARED_FONTS=<dir> overrides <romfs>/../../firmware/shared-fonts.
+// Address/Size instead of a hang. Relative configured paths are relative to the executable, not its working directory.
 #define SHARED_FONT_TYPES 6
 #define BFTTF_MAGIC 0x7f9a0218u
 static const char *const font_files[SHARED_FONT_TYPES] = {
@@ -745,17 +745,26 @@ static const char *const font_files[SHARED_FONT_TYPES] = {
 static struct { PlatMutex lock; const uint8_t *file[SHARED_FONT_TYPES]; uint64_t size[SHARED_FONT_TYPES]; } fonts;
 
 const char *ov_shared_font_dir(char *buf, size_t n) {
+    char exe[PLAT_PATH_MAX] = {0}, probe[PLAT_PATH_MAX + 40];
+    int len = plat_exe_path(exe, sizeof exe);
+    char *cut = len && len < sizeof exe ? plat_last_sep(exe) : NULL;
+    if (cut) *cut = 0;
     const char *e = cfg_get("TOTK_SHARED_FONTS");
-    if (e && *e) snprintf(buf, n, "%s", e);
-    else {
-        char exe[PLAT_PATH_MAX], probe[PLAT_PATH_MAX + 40];   // shared-fonts next to totk.exe (tools/package_build.py), else the repo's
-        int len = plat_exe_path(exe, sizeof exe);
-        char *cut = len && len < sizeof exe ? plat_last_sep(exe) : NULL;
-        if (cut) *cut = 0;
-        snprintf(probe, sizeof probe, "%s/shared-fonts/0-standard.bfttf", exe);
-        if (cut && plat_file_exists(probe)) snprintf(buf, n, "%s/shared-fonts", exe);
-        else snprintf(buf, n, "%s/../../firmware/shared-fonts", rt_config()->romfs);
+    if (e && *e) {
+        int absolute = e[0] == '\\' || e[0] == '/' || e[1] == ':';
+        if (cut && !absolute) snprintf(buf, n, "%s/%s", exe, e);
+        else snprintf(buf, n, "%s", e);
+        return buf;
     }
+    static const char *const dirs[] = {"fonts", "shared-fonts"};
+    for (unsigned i = 0; cut && i < sizeof dirs / sizeof *dirs; i++) {
+        snprintf(probe, sizeof probe, "%s/%s/0-standard.bfttf", exe, dirs[i]);
+        if (plat_file_exists(probe)) {
+            snprintf(buf, n, "%s/%s", exe, dirs[i]);
+            return buf;
+        }
+    }
+    snprintf(buf, n, "%s/../../firmware/shared-fonts", rt_config()->romfs);
     return buf;
 }
 

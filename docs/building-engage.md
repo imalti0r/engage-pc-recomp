@@ -35,6 +35,11 @@ Copy `config.engage.example.toml` to `config.local.toml` and fill in your local 
 
 The extractor checks the packages, update version and content integrity. The packer won't overwrite an existing output. If a step stops halfway through, check what it left behind before retrying. Keep your dumps and profile safe.
 
+Missing or blank required key-file paths are rejected with configuration hints.
+An omitted optional `input.title_keys` is passed to LibHac as an absent file;
+it does not require a placeholder path. Setup displays validation errors, such
+as selecting DLC in the Base game field, directly on its failure screen.
+
 ## Recompile locally
 
 ```powershell
@@ -43,9 +48,12 @@ The extractor checks the packages, update version and content integrity. The pac
 .\Run-Engage.cmd
 ```
 
-Lower `--jobs` if your machine is running out of memory. The first build takes a while. Generated game code, the built executable and the icon extracted from your game all stay private.
+Lower `--jobs` if your machine is running out of memory. The first build takes a while.
+Development builds produce a public `engage.exe` runtime and a private `engage_game.dll`
+beside it. Both are required to play. Generated game code and the DLL stay private.
+See [DLL builds and compatible updates](engage-game-library.md).
 
-The launcher sets Vulkan and the shared-font path, with the experimental recorder turned off. **F1** opens settings, **F10** changes the performance overlay, and **F11** toggles fullscreen. Keep `build/profile-engage` when rebuilding—that's your player data.
+You can launch `engage.exe` directly. Vulkan is the default, the experimental recorder is off for Engage unless enabled in settings, and fonts are found from the executable's folder or the extracted firmware tree. `Run-Engage.cmd` remains an optional developer helper. **F1** opens settings, **F10** changes the performance overlay, and **F11** togggles fullscreen. Keep `build/profile-engage` when rebuilding—that's your player data.
 
 The Engage patch table enables the game's 60 FPS timing path and checks the main
 module's build ID and original instruction before generation. F1's Game tab offers
@@ -66,6 +74,15 @@ Window size, fullscreen, display upscaling/sharpening, color adjustment, volume,
 input bindings and the general Vulkan controls remain available. Button mapping
 still supports Nintendo and Xbox layouts; in-game button images stay Nintendo.
 Features useful to Engage can return when they have an implementation and tests.
+
+## Launcher development
+
+Run `.venv-py314/Scripts/python -m engage_setup.gui --dest <install folder>`
+from the repository root for the launcher, or add `--setup` for the setup form.
+Source runs keep using the checkout and are updated through Git. The automatic
+copy-and-switch into the game folder applies to packaged installers only.
+See [launcher behavior and RomFS mod layouts](launcher.md) and
+[building a Windows setup package](releasing-engage.md#building-windows-setup).
 
 ## Check changes
 

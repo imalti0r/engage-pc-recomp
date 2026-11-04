@@ -2,9 +2,9 @@
 
 ## What goes in a release
 
-Ship the setup tools and source, not a built copy of the game. Setup extracts and compiles the player's own files on their PC. The game icon and shared fonts are taken from their inputs during setup.
+Ship the public runtime, setup tools and source. Setup extracts and compiles the player's own files into `engage_game.dll` on their PC. Shared fonts are taken from their inputs; the public runtime uses an original icon.
 
-Never upload a local install folder, `engage.exe`, game dumps, keys, firmware, saves, generated game code, extracted artwork or shader caches. Keep the upstream licenses and credits with the tools.
+Never upload a local install folder, `engage_game.dll`, an older monolithic `engage.exe`, game dumps, keys, firmware, saves, generated game code, extracted artwork or shader caches. The `bin/engage.exe` built without game inputs by the release builder is the public runtime and may ship with its `engage.json` contract/hash file. Keep the upstream licenses and credits with the tools.
 
 For source archives:
 
@@ -13,7 +13,7 @@ For source archives:
 3. Use `tools/make_engage_source_release.py` to audit and package the exact commit being released.
 4. Check the archive and checksums before uploading. Keep the tag on that commit.
 
-GitHub's source checks run without game files or keys. They help catch mistakes, but they don't replace playing the game. Local gameplay folders don't belong in Actions artifacts.
+Source CI checks run without game files or keys. They help catch mistakes, but they don't replace playing the game. Local gameplay folders don't belong in CI artifacts.
 
 ## Building Windows setup
 
@@ -31,11 +31,24 @@ From a clean, committed checkout, run this with Python 3.14:
 
 The builder checks the bundled Python, the missing-input error path and the setup window. It scans the package for game content, writes an inventory and makes a checksum file. Check the finished ZIP against that inventory too.
 
+The package has one entry point, `Engage-Launcher.exe`, for Play and Setup / Update.
+After a successful installation, Setup copies inventory-listed tools into a
+versioned `.launcher/` package in the game folder, verifies the files and opens
+the installed launcher. The top-level launcher selects that package through
+`launcher-current.txt`. The completion message permits deleting the original
+extracted setup folder only after this copy succeeds. Do not package a local
+game installation or any of its `.launcher`/`.setup-work` folders as a release.
+
+Published update checks require a newer release version and a matching setup ZIP
+and `SHA256SUMS`. Merging into `dev` alone does not publish an update. Keep the
+README's published-release links distinct from development-only instructions
+until a new release is actually uploaded and published.
+
 For a public release, merge the reviewed changes from `dev` into `main`, tag that source, and build from it. Upload the checked ZIPs to the project's generic package registry, then create the release with `glab release create <tag> --notes-file <file>` and attach each ZIP as a release link whose file path is its file name, so the README's `/-/releases/<tag>/downloads/<name>` links resolve. GitLab has no draft releases: set the release date in the future (`--released-at`) to keep it hidden as an upcoming release, check the hashes, then move the date to now to publish.
 
 ## What to test
 
-Try a fresh installation with the bundled tools and no developer tools on PATH. Check cancellation/retry, saves and settings, first launch, audio and the F1 menu. Setup runs `--probe-menu-font` before installing the compiled game, but the menu should also be opened and checked in a real run.
+Try a fresh installation with the bundled tools and no developer tools on PATH. Check cancellation/retry, saves and settings, first launch, audio and the F1 menu. Verify that Setup opens the installed launcher and that it still starts when the original extracted package is unavailable. Check Settings → Check for updates and the Update now / Later notice using an appropriate published or synthetic release. Check mod import, conflicts, enable/disable and the restart notice in both Mods pages. Setup runs `--probe-menu-font` before installing the compiled game, but the menu should also be opened and checked in a real run.
 
 Keep early builds marked as prereleases. Before calling the port broadly supported, test on a clean Windows machine and more hardware. Record what worked, what failed and what hasn't been checked yet.
 
@@ -51,6 +64,8 @@ Local testing has been on Windows 11 with an RTX 4060:
 - The opening movie rendered in a timed boot test, audio opened, and the game exited normally. First-launch shader work caused pauses.
 - The alpha.3 menu fix passed the font check and rendered all six settings tabs using a separate test profile. Screen and Sound were checked for readable text.
 - The setup window, missing-input check and package content scan passed. The README screenshot shows the empty setup form, with no personal paths or game artwork.
+- The launcher rendered all five pages from its installed tool package while the original setup folder was temporarily unavailable. Synthetic deployment tests cover copying, retries, corrupted packages, moving the game folder, preserving the prior package and failed handoff recovery. This is not a fresh full-game installation test.
+- Documentation includes maintainer-supplied launcher and empty-form setup screenshots. Their paths and exact hashes are reviewed by the source-release audit; provenance is recorded in `docs/screenshots/README.md`.
 
 Clean-machine installs, save/load, DLC gameplay, progress after the first battle and full-game stability still need testing. Keep the local test logs and gameplay screenshots out of release assets.
 

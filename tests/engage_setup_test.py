@@ -16,6 +16,20 @@ from installer.guilogic import STEP_ORDER
 
 
 class SetupTest(unittest.TestCase):
+    def test_extraction_failure_reason_reaches_setup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            pipeline = Pipeline(Form(dest=temp), SimpleNamespace(root=root), Reporter(out=io.StringIO()))
+            pipeline.work.mkdir()
+            pipeline.step = 'extract'
+            reason = 'Base game: the selected file contains DLC. Select the Engage base game NSP/XCI.'
+            child = SimpleNamespace(stdout=iter(['progress\n', f'ENGAGE_SETUP_ERROR: {reason}\n']),
+                                    wait=lambda **kwargs: 1, poll=lambda: 1)
+            with patch('engage_setup.pipeline.subprocess.Popen', return_value=child):
+                with self.assertRaises(ValueError) as error:
+                    pipeline.command(['synthetic-extractor'])
+            self.assertEqual(str(error.exception), reason)
+
     def test_form_requires_firmware_and_accepts_optional_dlcs(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -104,7 +118,7 @@ class SetupTest(unittest.TestCase):
             pipeline.command = lambda *args, **kwargs: None
             pipeline.dest.mkdir(exist_ok=True)
             pipeline.build.mkdir(parents=True)
-            for name in ('engage.exe', 'romfs-index.bin', 'SDL3.dll', 'totk_xlate.exe', 'totk_xlate.id'):
+            for name in ('engage.exe', 'engage_game.dll', 'romfs-index.bin', 'SDL3.dll', 'totk_xlate.exe', 'totk_xlate.id'):
                 (pipeline.build / name).write_bytes(b'synthetic host output')
             for directory in (pipeline.extracted / 'ExeFS', pipeline.extracted / 'packed-romfs', pipeline.work / 'fonts'):
                 directory.mkdir(parents=True)
@@ -114,12 +128,62 @@ class SetupTest(unittest.TestCase):
             (root / 'profile').mkdir()
             save = root / 'profile/keep-save'
             save.write_bytes(b'keep')
+            mod = root / 'mods/keep-mod/romfs/file'
+            mod.parent.mkdir(parents=True)
+            mod.write_bytes(b'keep mod')
             pipeline.prepare()
             pipeline.prepare()
             self.assertEqual(settings.read_text(), 'volume = 37\n')
             self.assertEqual(save.read_bytes(), b'keep')
+            self.assertEqual(mod.read_bytes(), b'keep mod')
             self.assertTrue((root / 'engage.exe').exists())
             self.assertTrue((root / 'romfs-index.bin').exists())
+            self.assertTrue((root / 'engage_game.dll').exists())
+            launcher = (root / 'Play Engage.cmd').read_text()
+            self.assertNotIn('TOTK_', launcher)
+            self.assertIn('%*', launcher)
+
+    def test_failed_pair_replacement_restores_previous_executable_and_dll(self):
+        with tempfile.TemporaryDirectory() as temp:
+            pipeline = Pipeline(Form(dest=temp), SimpleNamespace(), Reporter(out=io.StringIO()))
+            pipeline.build.mkdir(parents=True)
+            for name in ('engage.exe', 'engage_game.dll'):
+                (pipeline.dest / name).write_bytes(b'old ' + name.encode())
+                (pipeline.build / name).write_bytes(b'new ' + name.encode())
+            import os
+            replace = os.replace
+
+            def locked_executable(source, target):
+                if Path(source).name == 'engage.exe.new':
+                    raise PermissionError('synthetic running executable')
+                return replace(source, target)
+
+            with patch('engage_setup.pipeline.os.replace', side_effect=locked_executable):
+                with self.assertRaisesRegex(ValueError, 'Close Engage'):
+                    pipeline.deploy_game()
+            for name in ('engage.exe', 'engage_game.dll'):
+                self.assertEqual((pipeline.dest / name).read_bytes(), b'old ' + name.encode())
+                self.assertFalse((pipeline.dest / (name + '.new')).exists())
+
+    def test_legacy_install_migrates_even_when_release_string_matches(self):
+        with tempfile.TemporaryDirectory() as temp:
+            dest = Path(temp) / 'game'
+            (dest / 'exefs').mkdir(parents=True)
+            (dest / 'exefs/main').touch()
+            write_json(dest / 'engage-install.json', {'format': 1, 'title_id': TITLE, 'release': 'same',
+                       'done': list(STEP_ORDER[1:]), 'assets': ['romfs', 'exefs']})
+            pipeline = Pipeline(Form(dest=str(dest)), SimpleNamespace(release='same', root=Path(temp)),
+                                Reporter(out=io.StringIO()))
+            (Path(temp) / 'recomp').mkdir()
+            (Path(temp) / 'recomp/patches-engage-v200.txt').touch()
+            pipeline.check = lambda: None
+            pipeline.fingerprint = lambda: 'existing inputs'
+            pipeline.validate_resume = lambda: None
+            ran = []
+            for step in STEP_ORDER[1:]:
+                setattr(pipeline, step, lambda step=step: ran.append(step))
+            pipeline.run()
+            self.assertEqual(ran, ['lift', 'compile', 'prepare', 'cleanup'])
 
     def test_new_release_reruns_only_lift_compile_and_prepare(self):
         with tempfile.TemporaryDirectory() as temp:

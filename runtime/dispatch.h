@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include "cpu.h"
+#include "game_library.h"
 
 // A lifted module: its place in the guest layout and the generator's sorted function table.
 typedef struct RtModule {
@@ -21,8 +22,13 @@ typedef struct RtModule {
 // The module glue that tools/build_game.py writes for each build (build/<version>/modules.c), from layout.json and
 // layout.h: every module of the layout, and the modules linked into this executable.
 typedef struct RtLayoutEntry { const char *name; uint64_t base, size; } RtLayoutEntry;
+#ifdef RT_GAME_LIBRARY
+#define rt_layout (rt_game_library()->layout)
+#define rt_layout_count (rt_game_library()->layout_count)
+#else
 extern const RtLayoutEntry rt_layout[];
 extern const int rt_layout_count;
+#endif
 int rt_linked_modules(RtModule *out, int max);
 
 // Register a host function at a guest address outside every module (HLE entry points). Allowed only before

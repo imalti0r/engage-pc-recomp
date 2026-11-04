@@ -35,8 +35,10 @@ static int g_font_bad;
 
 extern "C" {
 #include "cfg.h"
+#include "game_library.h"
 #include "input.h"
 #include "input_map.h"
+#include "mods.h"
 #include "perfmon.h"
 #include "platform/platform.h"
 #include "sysinfo.h"
@@ -48,8 +50,10 @@ void vk_queue_lock(void);
 void vk_queue_unlock(void);
 void res_sizes(unsigned out[2], unsigned scene[2]);
 double frame_step_limit_hz(void);
+#ifndef RT_GAME_LIBRARY
 extern const int rt_game_id;
 extern const int rt_game_version;
+#endif
 // fs.h (romfs.c): romfs-patches-xbox was next to romfs-index.bin at start, and was loaded.
 int romfs_xbox_prompts_ready(void);
 int romfs_xbox_prompts_active(void);
@@ -394,7 +398,7 @@ extern "C" void menu_vk_release(void) {
 // TOTK_MENU_TEST_SET=<frame>:<key>=<value>[,<key>=<value>...][;<frame>:...]: cfg_set of each key (TOTK_ prefix
 // optional) at that presented frame; changes live settings with no input, menu open or not. totk.ini is written only by
 // the pseudo-key SAVE=1 (cfg_save, as a row change does; a failed write shows the menu's save note).
-enum { TAB_SCREEN, TAB_GAME, TAB_SOUND, TAB_CONTROLS, TAB_MENU, TAB_ADVANCED, TAB_COUNT };
+enum { TAB_SCREEN, TAB_GAME, TAB_SOUND, TAB_CONTROLS, TAB_MENU, TAB_ADVANCED, TAB_MODS, TAB_COUNT };
 enum { TEST_PAGE_FRAMES = 30, TEST_SETS = 16 };
 struct TestSet { uint64_t frame; char key[64], value[64]; };
 static struct {
@@ -905,8 +909,49 @@ static void tab_advanced(float scale) {
     }
 }
 
+static void tab_mods(float scale) {
+    opt_begin("##mods", scale);
+    opt_text(UI_MENU_MODS_HELP);
+    if (mods_restart_required()) opt_text(UI_MENU_MODS_RESTART, true);
+    if (*mods_problem()) ImGui::TextWrapped("%s", mods_problem());
+    if (opt_button("##mods_folder", UI_MENU_MODS_OPEN, UI_MENU_MODS_HELP))
+        plat_open_folder(mods_directory());
+    if (!mods_count()) opt_text(UI_MENU_MODS_EMPTY);
+    for (int group = 0; group < 3; group++) {
+      bool heading = false;
+      for (int i = 0; i < mods_count(); i++) {
+        ModInfo m;
+        if (!mods_get(i, &m)) continue;
+        int section = !m.supported ? 2 : m.active ? 0 : 1;
+        if (section != group) continue;
+        if (!heading) {
+            const UiTextId titles[] = {UI_MENU_MODS_ENABLED, UI_MENU_MODS_DISABLED, UI_MENU_MODS_UNAVAILABLE};
+            opt_group(titles[group]);
+            heading = true;
+        }
+        char id[48], desc[UI_DESC_BYTES], stats[256], note[160];
+        snprintf(id, sizeof id, "##mod_%d", i);
+        snprintf(stats, sizeof stats, menu_text(UI_MENU_MODS_STATS), m.files, m.replaced, m.added, m.shadowed);
+        snprintf(desc, sizeof desc, "%s\n\n%s\n\n%s%s%s\n\n%s", m.name, stats, m.problem,
+                 m.code ? "\n\n" : "", m.code ? menu_text(UI_MENU_MODS_CODE) : "",
+                 menu_text(UI_MENU_MODS_HELP));
+        if (!m.supported) opt_disable_next(UI_MENU_MODS_UNSUPPORTED);
+        else if (cfg_from_env("TOTK_MODS_DISABLED")) opt_disable_next(UI_MENU_SET_BY_ENV);
+        bool on = m.enabled;
+        snprintf(note, sizeof note, menu_text(m.shadowed ? UI_MENU_MODS_OVERLAPS : UI_MENU_MODS_ROW), m.files, m.shadowed);
+        if (opt_named_toggle(id, m.name, desc, &on,
+                             m.enabled != m.active ? menu_text(UI_MENU_MODS_RESTART) : m.supported ? note : menu_text(UI_MENU_MODS_UNSUPPORTED))) {
+            mods_set_enabled(i, on);
+            opt_save_soon();
+        }
+      }
+    }
+    opt_end();
+}
+
 static const UiTextId kTabNames[TAB_COUNT] = {UI_MENU_TAB_SCREEN, UI_MENU_TAB_GAME, UI_MENU_TAB_SOUND,
-                                              UI_MENU_TAB_CONTROLS, UI_MENU_TAB_MENU, UI_MENU_TAB_ADVANCED};
+                                              UI_MENU_TAB_CONTROLS, UI_MENU_TAB_MENU, UI_MENU_TAB_ADVANCED,
+                                              UI_MENU_TAB_MODS};
 static int g_tab;               // the tab shown
 static int g_tab_request = -1;  // select this tab at the next layout; -1 none
 static int g_focus_page = -1;   // this tab's first row takes the cursor once it is shown; -1 none
@@ -932,13 +977,14 @@ static void layout_menu(uint32_t w, uint32_t h, float scale) {
              : ImGui::IsKeyPressed(ImGuiKey_GamepadR1, false) || ImGui::IsKeyPressed(ImGuiKey_E, false) ? 1
              : ImGui::IsKeyPressed(ImGuiKey_GamepadL1, false) || ImGui::IsKeyPressed(ImGuiKey_Q, false) ? -1
                                                                                                          : 0;
-    if (step) g_tab_request = (g_tab + step + TAB_COUNT) % TAB_COUNT;
+    int tab_count = rt_game_id == 1 ? TAB_COUNT : TAB_MODS;
+    if (step) g_tab_request = (g_tab + step + tab_count) % tab_count;
     if (g_tab_request >= 0) g_focus_page = g_tab_request;   // the new page's first row takes the cursor
 
     const ImGuiStyle &st = ImGui::GetStyle();
     float bottom = ImGui::GetFrameHeight() + st.ItemSpacing.y * 2;
     if (ImGui::BeginTabBar("##tabs", ImGuiTabBarFlags_NoTabListScrollingButtons)) {
-        for (int k = 0; k < TAB_COUNT; k++) {
+        for (int k = 0; k < tab_count; k++) {
             char label[128];
             snprintf(label, sizeof label, "  %s  ###tab%d", menu_text(kTabNames[k]), k);   // the id stays per language
             if (!ImGui::BeginTabItem(label, nullptr, g_tab_request == k ? ImGuiTabItemFlags_SetSelected : 0)) continue;
@@ -959,6 +1005,7 @@ static void layout_menu(uint32_t w, uint32_t h, float scale) {
             case TAB_CONTROLS: tab_controls(scale); break;
             case TAB_MENU: tab_menu(scale); break;
             case TAB_ADVANCED: tab_advanced(scale); break;
+            case TAB_MODS: tab_mods(scale); break;
             }
             ImGui::EndTabItem();
         }
@@ -1306,7 +1353,7 @@ extern "C" int menu_overlay_frame(uint64_t frame, const MenuTarget *t, const cha
         const char *dir = cfg_get("TOTK_MENU_TEST_DIR");
         snprintf(path, sizeof path, "%s/menu-test-%llu-%d.png", dir ? dir : ".", (unsigned long long)frame, g_test.page);
         *shot = path;
-        if (++g_test.page == TAB_COUNT) {
+        if (++g_test.page == (rt_game_id == 1 ? TAB_COUNT : TAB_MODS)) {
             g_test.page = -1;
             set_open(0);   // the next frame lays out nothing
         } else {

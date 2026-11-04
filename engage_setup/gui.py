@@ -2,6 +2,7 @@
 import argparse
 import os
 import subprocess
+import sys
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
 
@@ -65,29 +66,89 @@ class App(BaseApp):
     def refresh_finish(self):
         super().refresh_finish()
         self.play_button.configure(state='normal' if self.model.result == 'ok' else 'disabled')
+        if self.model.result == 'ok' and not self.layout.dev and not getattr(self, 'handoff_scheduled', False):
+            self.handoff_scheduled = True
+            self.root.after_idle(self.open_installed_launcher)
+
+    def open_installed_launcher(self):
+        try:
+            from .installed_launcher import open_installed
+            open_installed(self.model.dest)
+        except OSError as error:
+            messagebox.showerror('Launcher could not start',
+                'Setup finished. Open Engage-Launcher.exe in your game folder.\n\n' + str(error), parent=self.root)
+            return
+        getattr(self, 'on_installed', self.root.destroy)()
 
     def play(self):
         from pathlib import Path
         dest = Path(self.model.dest)
         try:
-            subprocess.Popen([str(dest / 'engage.exe')], cwd=dest, env=play_environment(dest))
+            from .launcher import launch_game
+            launch_game(dest)
         except OSError as error:
             messagebox.showerror('Engage could not start', str(error), parent=self.root)
-
-
-def play_environment(dest):
-    return dict(os.environ, TOTK_GPU='vulkan', TOTK_VK_RECORDER='0', TOTK_SHARED_FONTS=str(dest / 'fonts'))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--selftest', action='store_true')
+    parser.add_argument('--setup', action='store_true', help='Open the setup wizard directly')
+    parser.add_argument('--dest', help='Select an existing game installation')
+    parser.add_argument('--shots', help='Write launcher screenshots during --selftest (requires Pillow)')
+    parser.add_argument('--apply-update', action='store_true', help='Finish a user-approved update of the selected install')
+    parser.add_argument('--setup-complete', action='store_true', help='Show where to launch the installed game')
     args = parser.parse_args()
+    paths = layout()
+    if not paths.dev and not args.selftest:
+        from .updates import redirect_target
+        target = redirect_target(paths.root)
+        if target:
+            subprocess.Popen([str(target), *sys.argv[1:]], cwd=target.parent)
+            return
     fix_tcl_paths()
     root = tk.Tk()
-    app = App(root, 'en', layout())
+    if args.setup:
+        app = App(root, 'en', paths)
+        if args.dest:
+            app.vars['dest'].set(args.dest)
+    else:
+        try:
+            from .launcher_gui import Launcher
+            app = Launcher(root, paths, args.dest, remember=not args.selftest, apply_update=args.apply_update)
+            if args.setup_complete and not args.selftest:
+                message = ('Setup is complete. You can delete the original extracted setup folder.\n\n'
+                           'From now on, open Engage-Launcher.exe in your game folder to play, change settings or run Setup / Update.\n\n'
+                           f'Game folder: {app.dest}')
+                app.status.set('Setup complete. Use Engage-Launcher.exe in your game folder. The original extracted setup folder can be deleted.')
+                root.after_idle(lambda: messagebox.showinfo('Setup complete', message, parent=root))
+        except (ImportError, OSError, RuntimeError) as error:
+            messagebox.showerror('Launcher could not start',
+                'Extract the entire setup ZIP, keeping its files together, then try again.\n\n' + str(error), parent=root)
+            root.destroy()
+            return
     if args.selftest:
-        root.after(1500, root.destroy)
+        if args.shots and not args.setup:
+            from pathlib import Path
+            from PIL import ImageGrab
+            output = Path(args.shots)
+            output.mkdir(parents=True, exist_ok=True)
+            pages = iter(app.pages)
+            def capture():
+                try:
+                    page = next(pages)
+                except StopIteration:
+                    root.destroy()
+                    return
+                app.show(page)
+                def shot():
+                    x, y = root.winfo_rootx(), root.winfo_rooty()
+                    ImageGrab.grab(bbox=(x, y, x + root.winfo_width(), y + root.winfo_height())).save(output / f'launcher-{page}.png')
+                    root.after(200, capture)
+                root.after(150, shot)
+            root.after(600, capture)
+        else:
+            root.after(1500, root.destroy)
     root.mainloop()
 
 
