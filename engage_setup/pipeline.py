@@ -35,7 +35,9 @@ def write_json(path, data):
 def validate_destination(dest, inputs, root):
     dest = dest.resolve()
     root = Path(root).resolve()
-    if dest == Path(dest.anchor) or dest == root or root.is_relative_to(dest) or dest.is_relative_to(root):
+    from .installed_launcher import installed_game
+    own_launcher = installed_game(root) == dest
+    if dest == Path(dest.anchor) or dest == root or (root.is_relative_to(dest) and not own_launcher) or dest.is_relative_to(root):
         raise ValueError('Choose a separate install folder outside the setup package.')
     if any(p.resolve() == dest or p.resolve().is_relative_to(dest) or dest.is_relative_to(p.resolve()) for p in inputs):
         raise ValueError('Keep the install folder separate from your input files and firmware.')
@@ -112,14 +114,19 @@ class Pipeline:
         child = subprocess.Popen(list(map(str, arguments)), cwd=self.paths.root, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, encoding='utf-8', errors='replace', creationflags=flags, env=environment)
         # Child shares setup's process group: the existing GUI cancellation controller stops the whole job.
+        failure_reason = None
         try:
             for line in child.stdout:
                 self.reporter.log(redact(line.rstrip()))
+                if line.startswith('ENGAGE_SETUP_ERROR: '):
+                    failure_reason = redact(line.removeprefix('ENGAGE_SETUP_ERROR: ').strip())
                 match = re.search(r'^\[(\d+)/(\d+)\]', line)
                 if match:
                     self.reporter.progress(self.step, 'work', done=int(match[1]), total=int(match[2]), unit='objects')
             code = child.wait(timeout=timeout)
             if code:
+                if failure_reason:
+                    raise ValueError(failure_reason)
                 raise ValueError(f'{self.step.capitalize()} failed (exit {code}). Open the setup log for details.')
         finally:
             if child.poll() is None:
@@ -248,6 +255,8 @@ class Pipeline:
                 if source.name != 'engage_game.dll':
                     self.deploy(source)
         self.deploy(self.build / 'romfs-index.bin')
+        from .game_icon import prepare_icon
+        prepare_icon(self.extracted / 'icon.jpg', self.dest / 'engage.ico')
         # Never replace the player's settings or profile.
         settings = self.dest / 'engage.ini'
         if not settings.exists():
@@ -345,6 +354,10 @@ class Pipeline:
                 self.state['done'].append(step)
                 write_json(self.dest / 'engage-install.json', self.state)
                 self.reporter.step(step, 'done')
+            if not getattr(self.paths, 'dev', True):
+                self.reporter.log('Installing the launcher and setup tools beside the game…')
+                from .installed_launcher import install_launcher
+                install_launcher(self.paths.root, self.dest)
         self.reporter.emit('end', result='ok', seconds=self.reporter.elapsed())
 
     def reuse_exefs(self):

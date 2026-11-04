@@ -6,13 +6,25 @@ from make_engage_source_release import audit_member
 
 
 class ReleaseBoundaryTest(unittest.TestCase):
-    def test_only_the_reviewed_setup_screenshot_is_allowed(self):
-        screenshot = Path(__file__).resolve().parents[1] / 'docs/screenshots/setup.png'
-        audit_member('docs/screenshots/setup.png', screenshot.read_bytes())
-        with self.assertRaises(ValueError):
-            audit_member('docs/screenshots/setup.png', b'unreviewed replacement')
-        with self.assertRaises(ValueError):
-            audit_member('docs/screenshots/gameplay.png', screenshot.read_bytes())
+    def test_only_reviewed_original_launcher_art_is_allowed(self):
+        root = Path(__file__).resolve().parents[1]
+        for name in ('engage_setup/art/cathedral.jpg', 'engage_setup/art/title.webp'):
+            data = (root / name).read_bytes()
+            audit_member(name, data)
+            with self.assertRaises(ValueError):
+                audit_member(name, data + b'unreviewed change')
+            with self.assertRaises(ValueError):
+                audit_member('docs/screenshots/unreviewed.webp', data)
+
+    def test_only_reviewed_launcher_and_setup_screenshots_are_allowed(self):
+        root = Path(__file__).resolve().parents[1]
+        for name in ('docs/screenshots/setup.png', 'docs/screenshots/launcher.png'):
+            data = (root / name).read_bytes()
+            audit_member(name, data)
+            with self.assertRaises(ValueError):
+                audit_member(name, data + b'unreviewed replacement')
+            with self.assertRaises(ValueError):
+                audit_member('docs/screenshots/gameplay.png', data)
 
     def test_private_outputs_and_links_are_rejected(self):
         for name in ('build/engage.exe', 'generated/main.c', 'config.local.toml', 'prod.keys',

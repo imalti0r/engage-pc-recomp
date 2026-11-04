@@ -42,10 +42,14 @@ static class P {
         // always names the one it packs. Without it every Application content meta's NCAs are kept and the lowest Program NCA is the game
         ulong? app = null; int ai = Array.IndexOf(a, "--app");
         if (ai >= 0 && ai + 1 < a.Length) { app = Convert.ToUInt64(a[ai + 1], 16); var rest = new List<string>(a); rest.RemoveRange(ai, 2); a = rest.ToArray(); }
-        if (a.Length == 3 && a[1] == "--title") return Title(ExternalKeyReader.ReadKeyFile(a[0], Environment.GetEnvironmentVariable("ENGAGE_TITLE_KEYS")), a[2]);
-        if (a.Length == 3 && a[1] == "--contents") return Contents(ExternalKeyReader.ReadKeyFile(a[0], Environment.GetEnvironmentVariable("ENGAGE_TITLE_KEYS")), a[2]);
+        if (a.Length == 3 && (a[1] == "--title" || a[1] == "--contents")) {
+            KeySet queryKeys = LoadKeys(a[0]);
+            if (queryKeys == null) return 2;
+            return a[1] == "--title" ? Title(queryKeys, a[2]) : Contents(queryKeys, a[2]);
+        }
         if (a.Length < 4) { Console.Error.WriteLine("usage: nx_extract <prod.keys> <base.nsp> <update.nsp|-> <out dir> [base RomFS dir] [--app <title ID>] [--romfs-image|--manifest] [--allow-damaged]\n       nx_extract <prod.keys> --aoc <dlc.nsp> <out dir or image> [<DLC title ID>] [--romfs-image]\n       nx_extract <prod.keys> --title <nsp|nsz|xci|xcz>\n       nx_extract <prod.keys> --contents <nsp|nsz|xci|xcz>"); return 2; }
-        KeySet ks = ExternalKeyReader.ReadKeyFile(a[0], Environment.GetEnvironmentVariable("ENGAGE_TITLE_KEYS"));
+        KeySet ks = LoadKeys(a[0]);
+        if (ks == null) return 2;
         if (a[1] == "--aoc") return Aoc(ks, a[2], a[3], image, a.Length > 4 ? Convert.ToUInt64(a[4], 16) : null);
         // each by its own content meta: a merged package (base game + update + DLC in one NSP, a cartridge dump with its update) is given as both the base game and the update,
         // and the base game's Program NCA and the update's have the same title ID, so without the filter the update would be layered on itself or on the wrong base
@@ -93,6 +97,29 @@ static class P {
         else if (image) WriteImage(new RomFsFileSystem(romfs), Path.Combine(outDir, "RomFS.img"));
         else Copy(new RomFsFileSystem(romfs), Path.Combine(outDir, "RomFS"), cmpDir);
         return Damaged();
+    }
+
+    static KeySet LoadKeys(string keys) {
+        string titleKeys = Environment.GetEnvironmentVariable("ENGAGE_TITLE_KEYS");
+        // LibHac 0.19 skips null filenames, but tries to open empty strings.
+        if (string.IsNullOrWhiteSpace(titleKeys)) titleKeys = null;
+        if (string.IsNullOrWhiteSpace(keys)) {
+            Console.Error.WriteLine("Missing prod.keys path (argument 1 / input.keys). Select the keys file in Setup or set input.keys in the config.");
+            return null;
+        }
+        foreach (var item in new[] { (keys, "prod.keys (argument 1 / input.keys)"), (titleKeys, "title.keys (ENGAGE_TITLE_KEYS / input.title_keys)") }) {
+            if (item.Item1 != null && !File.Exists(item.Item1)) {
+                Console.Error.WriteLine($"The {item.Item2} file does not exist or is inaccessible. Select an existing file; clear input.title_keys / ENGAGE_TITLE_KEYS to omit optional title keys.");
+                return null;
+            }
+        }
+        try {
+            return ExternalKeyReader.ReadKeyFile(filename: keys, titleKeysFilename: titleKeys, consoleKeysFilename: null);
+        } catch (Exception error) when (error is IOException || error is UnauthorizedAccessException || error is ArgumentException || error is FormatException || error is OverflowException) {
+            // Parsing errors may contain key material; do not print the exception.
+            Console.Error.WriteLine("Cannot read the configured key files. Check input.keys and input.title_keys / ENGAGE_TITLE_KEYS, file permissions, and key-file format.");
+            return null;
+        }
     }
 
     static int Title(KeySet ks, string path) {

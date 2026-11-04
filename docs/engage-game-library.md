@@ -4,7 +4,13 @@ Development builds separate the public Windows runtime (`engage.exe`) from
 `engage_game.dll`, which setup builds from the player's Engage 2.0.0 files.
 Alpha.5 downloads still use the earlier single-executable layout.
 
-Double-click `engage.exe` or a Windows shortcut to it; the normal EXE does not open a terminal window. A CMD launcher is optional.
+For a packaged installation, use `Engage-Launcher.exe` in the game folder for
+Play, settings, mods and Setup / Update. Setup installs its tools in `.launcher/`
+and switches to that installed copy; the original extracted setup folder can
+then be deleted. See [installation and updates](installing-engage.md).
+
+You can still double-click `engage.exe` or a Windows shortcut to it; the normal
+EXE does not open a terminal window. A CMD launcher is optional.
 Configured relative font paths resolve beside the EXE; otherwise it discovers
 `fonts/`, `shared-fonts/` or the extracted firmware fonts. A sibling `profile/`
 is used for saves, independently of a shortcut's working directory.

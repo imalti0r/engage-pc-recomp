@@ -44,8 +44,8 @@ struct Desc { char text[UI_DESC_BYTES]; };
 static Desc g_hover, g_focus, g_first, g_shown;
 
 // disabled: the note of a row opt_disable_next greyed out, else NULL.
-static void desc_set(Desc &d, UiTextId desc, const char *key, const CfgMeta *m, const char *disabled) {
-    int n = snprintf(d.text, sizeof d.text, "%s", menu_text(desc));
+static void desc_set(Desc &d, UiTextId desc, const char *key, const CfgMeta *m, const char *disabled, const char *raw = nullptr) {
+    int n = snprintf(d.text, sizeof d.text, "%s", raw ? raw : menu_text(desc));
     if (n < 0 || n >= (int)sizeof d.text) return;
     if (disabled)
         snprintf(d.text + n, sizeof d.text - n, "\n\n%s", disabled);
@@ -113,7 +113,8 @@ struct RowView {
 
 // One row: draws it, handles A / click and left / right while selected. Returns 2 (A / click), -1 / +1 (left / right) or
 // 0; always 0 for a row the environment fixes (greyed out, still selectable so its description shows).
-static int row(const char *key, UiTextId label, UiTextId desc, const RowView &v) {
+static int row(const char *key, UiTextId label, UiTextId desc, const RowView &v,
+               const char *raw_label = nullptr, const char *raw_desc = nullptr) {
     const CfgMeta *m = cfg_meta(key);
     const char *disabled = g_disable_next ? menu_text(g_disable_note) : NULL;
     g_disable_next = false;
@@ -150,9 +151,9 @@ static int row(const char *key, UiTextId label, UiTextId desc, const RowView &v)
             ImGui::SetKeyOwner(k, ImGui::GetItemID());
         }
     }
-    if (foc) desc_set(g_focus, desc, key, m, disabled);
-    if (hov) desc_set(g_hover, desc, key, m, disabled);
-    if (!g_first.text[0]) desc_set(g_first, desc, key, m, disabled);
+    if (foc) desc_set(g_focus, desc, key, m, disabled, raw_desc);
+    if (hov) desc_set(g_hover, desc, key, m, disabled, raw_desc);
+    if (!g_first.text[0]) desc_set(g_first, desc, key, m, disabled, raw_desc);
 
     ImDrawList *dl = ImGui::GetWindowDrawList();
     ImFont *font = ImGui::GetFont();
@@ -191,7 +192,7 @@ static int row(const char *key, UiTextId label, UiTextId desc, const RowView &v)
     }
     // the label and its note, clipped before the value
     ImVec4 clip(p.x, p.y, value_left - fs * 0.6f, p.y + h);
-    dl->AddText(font, fs, ImVec2(p.x + pad, ty), off ? kGrey : IM_COL32(240, 236, 224, 255), menu_text(label), NULL, 0,
+    dl->AddText(font, fs, ImVec2(p.x + pad, ty), off ? kGrey : IM_COL32(240, 236, 224, 255), raw_label ? raw_label : menu_text(label), NULL, 0,
                 &clip);
     const char *note = disabled        ? disabled
                      : off             ? menu_text(UI_MENU_SET_BY_ENV)
@@ -237,6 +238,13 @@ bool opt_toggle(const char *key, UiTextId label, UiTextId desc, bool inverted) {
     RowView v = {menu_text(on ? UI_MENU_ON : UI_MENU_OFF), set == def, false, NULL};
     if (!row(key, label, desc, v)) return false;   // any step flips it
     apply(key, set ? "0" : "1");
+    return true;
+}
+
+bool opt_named_toggle(const char *id, const char *label, const char *description, bool *on, const char *note) {
+    RowView v = {menu_text(*on ? UI_MENU_ON : UI_MENU_OFF), false, false, note};
+    if (!row(id, UI_MENU_ON, UI_MENU_ON, v, label, description)) return false;
+    *on = !*on;
     return true;
 }
 

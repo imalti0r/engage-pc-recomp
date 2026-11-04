@@ -35,6 +35,11 @@ Copy `config.engage.example.toml` to `config.local.toml` and fill in your local 
 
 The extractor checks the packages, update version and content integrity. The packer won't overwrite an existing output. If a step stops halfway through, check what it left behind before retrying. Keep your dumps and profile safe.
 
+Missing or blank required key-file paths are rejected with configuration hints.
+An omitted optional `input.title_keys` is passed to LibHac as an absent file;
+it does not require a placeholder path. Setup displays validation errors, such
+as selecting DLC in the Base game field, directly on its failure screen.
+
 ## Recompile locally
 
 ```powershell
@@ -69,6 +74,15 @@ Window size, fullscreen, display upscaling/sharpening, color adjustment, volume,
 input bindings and the general Vulkan controls remain available. Button mapping
 still supports Nintendo and Xbox layouts; in-game button images stay Nintendo.
 Features useful to Engage can return when they have an implementation and tests.
+
+## Launcher development
+
+Run `.venv-py314/Scripts/python -m engage_setup.gui --dest <install folder>`
+from the repository root for the launcher, or add `--setup` for the setup form.
+Source runs keep using the checkout and are updated through Git. The automatic
+copy-and-switch into the game folder applies to packaged installers only.
+See [launcher behavior and RomFS mod layouts](launcher.md) and
+[building a Windows setup package](releasing-engage.md#building-windows-setup).
 
 ## Check changes
 

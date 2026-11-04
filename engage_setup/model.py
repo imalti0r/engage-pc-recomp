@@ -20,7 +20,7 @@ TEXT = {
     'ui.need_update': 'Choose the Engage 2.0.0 update.',
     'ui.need_firmware': 'Choose an extracted firmware NCA folder.',
     'ui.missing_firmware': 'The firmware folder does not exist.',
-    'ui.done_text': 'Engage is installed in {dest}. Select Play Engage to start.\nKeep this setup package if you need to rebuild. Your original dumps are unchanged.',
+    'ui.done_text': 'Engage is installed in {dest}. Select Play Engage to start. Your original dumps are unchanged.',
     'ui.update_mode': 'This folder contains an unfinished Engage installation. Setup will resume it.\nUse the same input files you used before.',
     'ui.update_ready': 'Update mode: this folder already has Engage installed.\nLeave every file field empty and click Update Engage. Your saves and settings are kept, and the game is not extracted again.',
     'ui.update_start': 'Update Engage',
@@ -99,7 +99,10 @@ class Form(BaseForm):
 def layout(root=None):
     root = Path(root or Path(__file__).resolve().parents[1]).resolve()
     dev = not (root / 'python/python.exe').is_file()
+    channel_path = root / 'BUILD_CHANNEL'
+    channel = channel_path.read_text().strip() if channel_path.is_file() else 'dev' if dev else 'release'
     return SimpleNamespace(root=root, dev=dev, release=(root / 'VERSION').read_text().strip(),
+        channel=channel,
         python=root / '.venv-py314/Scripts/python.exe' if dev else root / 'python/python.exe',
         runtime=root / 'runtime', llvm=root / 'toolchain/engage/llvm' if dev else root / 'llvm',
         deps=root / 'toolchain/engage/runtime/deps' if dev else root / 'runtime/deps',

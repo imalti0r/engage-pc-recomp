@@ -11,18 +11,36 @@ A native Windows port of **Fire Emblem Engage 2.0.0**, built on [TotK Recomp](ht
 
 ## Installing
 
-Setup works much like TotK Recomp: pick your files, let it build, then play. Python, the compiler and the extractor are included, so you don't need to install those yourself.
+The launcher handles installation, Play, settings, RomFS mods, save backups and updates. Python, the compiler and the extractor are included.
 
-1. Download the Windows setup ZIP above and extract the whole thing.
-2. Open **Engage-Setup.exe**. Select your base game, **2.0.0** update, keys and extracted firmware folder. Both DLCs are optional.
+**The screenshots and launcher instructions below describe `dev`.** The linked alpha.5 download uses the older `Engage-Setup.exe` and does not include these launcher features. Merging into `dev` does not publish a new installer; use a launcher-enabled test build until the next release.
+
+![Engage launcher with Play, Mods, Saves and Settings](docs/screenshots/launcher.png)
+
+For a launcher-enabled build:
+
+1. Extract the entire setup ZIP, keeping its files and folders together.
+2. Open **Engage-Launcher.exe** and choose **Setup / Update**. Select your base game, **2.0.0** update, keys and extracted firmware folder. Both DLCs are optional.
 3. Pick an empty install folder with **40 GiB free** and click **Install Engage**.
-4. Once it's done, click **Play Engage**. Next time, double-click **engage.exe** in that folder or create a Windows shortcut to it. **F1** opens settings. The CMD file is optional for troubleshooting.
+4. Setup copies the launcher and tools into your game folder, verifies them, and switches to the installed launcher. You can then delete the original extracted setup folder. Use the game folder's **Engage-Launcher.exe** from now on; keep its **.launcher** folder with the game.
 
-![Engage Setup](docs/screenshots/setup.png)
+![Engage Setup with required inputs and optional DLC and title keys](docs/screenshots/setup.png)
 
 If you're not sure which files to pick, the [setup guide](docs/installing-engage.md) walks through each field and the common errors.
 
-**Updating:** run the newer setup on your existing install folder. Saves and settings are kept, and game files aren't extracted again.
+**F1** opens in-game settings. The [setup guide](docs/installing-engage.md) explains each input, installation folders, recovery and older alpha.5 installs.
+
+## RomFS mods
+
+Open **Mods** to import a ZIP or extracted mod folder, search your collection, inspect file overlaps, and enable or disable mods. You can also use **F1 → Mods** in-game. Changes take effect after restarting the game; loaded assets cannot be switched live. The original game data is left unchanged.
+
+Use mods made for Engage 2.0.0 that replace or add RomFS files. Code patches and Cobalt plugins are not supported. See [supported folder layouts, priority and limitations](docs/launcher.md#romfs-mods).
+
+## Updates
+
+The installed launcher checks for newer published releases when it opens. **Settings → Check for updates** checks manually. An available update shows **Update now** and **Later**; updates are not installed without your confirmation.
+
+The updater verifies the download, restarts the launcher and runs Setup / Update for your selected game folder. Saves, settings and mods are kept. Valid extraction and build caches are reused, although a compatibility change can require rebuilding the private game DLL. Keep `.launcher` and `.setup-work` with your installation. [Update and recovery details](docs/installing-engage.md#updating).
 
 **Use alpha.3 or newer.** Alpha.2 was missing the menu font, which could crash the game when you pressed F1. That's fixed in [#2](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/merge_requests/2).
 
@@ -32,6 +50,7 @@ If you're not sure which files to pick, the [setup guide](docs/installing-engage
 - The first battle, including attack cutscenes.
 - Audio, keyboard and gamepad input.
 - The F1 settings menu. All six tabs were checked in the repaired build.
+- Development launcher: installed-copy handoff, settings, RomFS mod controls, save backups and verified update handling. Full installations and updates on a clean Windows machine still need testing.
 - Game output resolution and 3D render scale controls, plus corrected exploration movement speed at 60 FPS.
 - Loading an existing Chapter 1 exploration save in an isolated test profile.
 - Both DLC packages are detected and mounted. Their actual content still needs testing.

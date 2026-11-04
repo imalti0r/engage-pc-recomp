@@ -73,7 +73,9 @@ def copy_sources(out):
             continue
         source = ROOT / relative
         if source.suffix.lower() not in {'.py', '.c', '.cc', '.cpp', '.h', '.hpp', '.json', '.ps1', '.txt',
-                                        '.manifest', '.inl', '.glsl', '.comp', '.spv', '.inc'} and relative.as_posix() != 'runtime/ui/fonts/Roboto-Medium.ttf':
+                                        '.manifest', '.inl', '.glsl', '.comp', '.spv', '.inc'} and relative.as_posix() not in {
+                'runtime/ui/fonts/Roboto-Medium.ttf', 'engage_setup/art/cathedral.jpg',
+                'engage_setup/art/title.webp', 'engage_setup/art/README.md'}:
             continue
         target = out / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -97,6 +99,7 @@ def licenses(out):
     shutil.copy2(ROOT / 'tools/nx_extract/LibHac-LICENSE.txt', lic / 'LibHac-LICENSE.txt')
     shutil.copy2(ROOT / 'tools/vendor/macnativegames/LICENSE', lic / 'macnativegames-LICENSE.txt')
     shutil.copy2(ROOT / 'tools/vendor/ryujinx/LICENSE.txt', lic / 'ryujinx-LICENSE.txt')
+    shutil.copy2(out / 'python/Lib/site-packages/pillow-13.0.0.dist-info/licenses/LICENSE', lic / 'Pillow-LICENSE.txt')
     dotnet = Path.home() / '.nuget/packages/microsoft.netcore.app.runtime.win-x64/10.0.13'
     for name in ('LICENSE.TXT', 'THIRD-PARTY-NOTICES.TXT'):
         shutil.copy2(dotnet / name, lic / ('dotnet-' + name))
@@ -107,7 +110,7 @@ def licenses(out):
             (lic / ('libvpx-' + name + '.txt')).write_bytes(archive.extractfile('libvpx-1.17.0/' + name).read())
 
 
-def build(out):
+def build(out, channel='dev'):
     out = out.resolve()
     if not out.is_relative_to((ROOT / 'build/release').resolve()):
         raise ValueError('Setup candidates must be built inside build/release')
@@ -117,6 +120,7 @@ def build(out):
     upstream.build_llvm(out)
     upstream.build_deps(out)
     copy_sources(out)
+    (out / 'BUILD_CHANNEL').write_text(channel + '\n', encoding='utf-8')
     commit = subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip()
     (out / 'SOURCE_COMMIT').write_text(commit + '\n', encoding='utf-8')
     binary = out / 'bin'
@@ -140,18 +144,12 @@ def build(out):
     upstream.run([clang, '-O2', '-I' + str(out / 'runtime/deps/include'),
                   ROOT / 'installer/hostcheck.c', '-o', binary / 'hostcheck.exe'])
     setup_icon(out / 'runtime/engage-setup.ico')
-    launcher = (ROOT / 'installer/launcher/launcher.c').read_text().replace('-m installer.gui', '-m engage_setup.gui')
     work = ROOT / 'build/release/engage-launcher'
     work.mkdir(exist_ok=True)
-    (work / 'launcher.c').write_text(launcher)
-    (work / 'launcher_text.h').write_text('''#define LAUNCHER_TITLE_EN L"Engage Setup"
-#define LAUNCHER_TITLE_RU LAUNCHER_TITLE_EN
-#define LAUNCHER_PYTHON_MISSING_EN L"Extract the entire Engage-Setup ZIP, then run Engage-Setup.exe again."
-#define LAUNCHER_PYTHON_MISSING_RU LAUNCHER_PYTHON_MISSING_EN
-''')
     (work / 'launcher.rc').write_text(f'1 ICON "{(out / "runtime/engage-setup.ico").as_posix()}"\n1 24 "{(ROOT / "runtime/totk.manifest").as_posix()}"\n')
     upstream.run([out / 'llvm/bin/llvm-windres.exe', work / 'launcher.rc', '-O', 'coff', '-o', work / 'launcher.o'])
-    upstream.run([clang, '-O2', '-mwindows', work / 'launcher.c', work / 'launcher.o', '-o', out / 'Engage-Setup.exe'])
+    upstream.run([clang, '-O2', '-mwindows', '-municode', ROOT / 'engage_setup/launcher_win.c', work / 'launcher.o', '-o', out / 'Engage-Launcher.exe'])
+    (out / 'Engage-Setup.exe').unlink(missing_ok=True)
     runtime_build = ROOT / 'build/release/engage-public-runtime'
     upstream.run([out / 'python/python.exe', '-I', out / 'tools/build_engage.py', '--runtime-only',
                   '--out', runtime_build, '--runtime', out / 'runtime', '--toolchain', out / 'llvm',
@@ -161,10 +159,12 @@ def build(out):
     upstream.run([binary / 'engage.exe', '--probe-menu-font'], env=upstream.clean_env(depsbin))
     licenses(out)
     (out / 'START-HERE.txt').write_text('Engage PC Recomp — experimental setup\n\n'
-        '1. Extract this entire ZIP into a folder.\n2. Run Engage-Setup.exe.\n'
+        '1. Extract this entire ZIP into a folder.\n2. Run Engage-Launcher.exe and choose Setup / Update.\n'
         '3. Choose your own base game, update 2.0.0, prod.keys and extracted firmware folder.\n'
         '4. Optionally add either DLC package and title.keys, then choose a separate install folder.\n'
-        '5. Select Install. When it finishes, select Play Engage.\n\n'
+        '5. Select Install. When it finishes, Setup switches to the launcher in your game folder.\n'
+        '   You can then delete the original extracted setup folder. Keep .launcher with the game.\n'
+        '6. Use the launcher for settings, RomFS mods and save backups.\n\n'
         'Requirements: Windows 10/11 x64, AVX2 CPU, Vulkan 1.3 GPU/driver, 40 GiB free.\n'
         'Setup builds engage_game.dll locally and uses the included public runtime. No game files or keys are included.\n'
         'First install may take 20–60 minutes. Shaders cache during play.\n'
@@ -179,6 +179,7 @@ def build(out):
         if result.returncode != 1 or not events or events[-1].get('result') != 'failed' or dest.exists():
             raise ValueError('The bundled missing-input failure check did not pass')
     upstream.run([out / 'python/python.exe', '-I', '-m', 'engage_setup.gui', '--selftest'], env=upstream.clean_env())
+    upstream.run([out / 'python/python.exe', '-I', '-m', 'engage_setup.gui', '--setup', '--selftest'], env=upstream.clean_env())
     for cache in sorted(out.rglob('__pycache__'), key=lambda p: len(p.parts), reverse=True):
         if not cache.resolve().is_relative_to(out):
             raise ValueError('Unexpected cache link outside setup')
@@ -207,7 +208,7 @@ def main():
     args = parser.parse_args()
     if args.zip and subprocess.check_output(['git', '-C', str(ROOT), 'status', '--porcelain']).strip():
         parser.error('Commit the reviewed source before making a public ZIP. Omit --zip for a development candidate.')
-    out = build(args.out)
+    out = build(args.out, 'release' if args.zip else 'dev')
     if args.zip:
         with zipfile.ZipFile(args.zip, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
             for file in sorted(out.rglob('*')):

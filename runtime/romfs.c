@@ -24,6 +24,7 @@
 #include "cfg.h"
 #include "fs.h"
 #include "host.h"
+#include "mods.h"
 #ifdef RT_GAME_LIBRARY
 #define ROMFS_IMAGE_SIZE (rt_game_library()->romfs_size)
 #define ROMFS_IMAGE_SHA256 (rt_game_library()->romfs_sha256)
@@ -290,6 +291,37 @@ bad:
 #undef BAD
 }
 
+static int mod_overlay(const char *name, const char *path, void *ctx) {
+    size_t legacy = *(size_t *)ctx;
+    uint64_t i = lower(name);
+    int exists = i < file_count && !strcmp(entry_name(entry(i)), name);
+    if (!exists) i = ADDED;
+    PlatFile *f = open_read(path);
+    if (!f) rt_fatal("RomFS mod: cannot open %s; restart after fixing the mod", path);
+    Identity id = identity_of(f);
+    plat_file_close(f);
+    size_t slot = noverlay;
+    for (size_t k = 0; k < legacy; k++)
+        if (!strcmp(overlays[k].name, name)) { slot = k; break; }
+    if (slot == noverlay) {
+        if (noverlay == overlay_cap) {
+            overlay_cap = overlay_cap ? overlay_cap * 2 : 16;
+            overlays = realloc(overlays, overlay_cap * sizeof *overlays);
+            need(overlays != NULL, "mod overlay table");
+        }
+        noverlay++;
+    } else {
+        free(overlays[slot].path);
+        free(overlays[slot].name);
+    }
+    char *host = strdup(path), *relative = strdup(name);
+    need(host && relative, "mod path copy");
+    overlays[slot] = (Overlay){i, id.size, host, relative, id};
+    rt_log("RomFS mod: %s (%llu bytes) %s", name, (unsigned long long)id.size,
+           exists ? "replaces the original" : "is added");
+    return exists ? MOD_FILE_REPLACED : MOD_FILE_ADDED;
+}
+
 static int overlay_order(const void *a, const void *b) {
     uint64_t x = ((const Overlay *)a)->index, y = ((const Overlay *)b)->index;
     return (x > y) - (x < y);
@@ -433,6 +465,10 @@ static void overlay_init(void) {
     const char *dirs[2] = {patches, cfg_get("TOTK_ROMFS_MODS")};
     for (int i = 0; i < 2; i++)
         if (dirs[i] && *dirs[i] && strcmp(dirs[i], "0")) overlay_load(dirs[i], 0);
+    if (RT_ENGAGE) {
+        size_t legacy = noverlay;
+        mods_each_file(mod_overlay, &legacy);
+    }
     heapdef_overlay();
     added_init();
     if (noverlay) qsort(overlays, noverlay, sizeof *overlays, overlay_order);
