@@ -78,6 +78,12 @@ These tools run on the developer's or player's machine during the build. They ar
 
 ## Distributed in the installer release
 
+The Engage launcher also bundles Pillow 13.0.0 (https://python-pillow.org),
+MIT-CMU, copyright Secret Labs AB, Fredrik Lundh, Jeffrey A. Clark and
+contributors. Its complete license and bundled-library notices are preserved in
+`python/Lib/site-packages/pillow-13.0.0.dist-info/licenses/LICENSE` and
+`licenses/Pillow-LICENSE.txt`.
+
 `tools/make_release.py` assembles these into the release folder of `docs/installer.md`. Versions and sha256 of every download are pinned in that script; licence texts are in the folder's `licenses/` and in each component's own folder.
 
 | Component | Source | License | Where in the release |

@@ -42,6 +42,9 @@ Click **Show log** for more detail. The error screen also gives you the log's lo
 
 ## Saves and settings
 
+Development builds also include a [launcher with settings, RomFS mods and save
+backups](launcher.md). This is not included in the published alpha.5 download.
+
 Inside your install folder:
 
 - `profile` holds your saves and player data. Back it up before experimenting.

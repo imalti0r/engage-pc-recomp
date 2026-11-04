@@ -25,6 +25,7 @@
 
 #include "cfg.h"
 #include "fs.h"
+#include "mods.h"
 #include "host.h"
 #include "platform/platform.h"
 #include "ui/menu.h"
@@ -452,7 +453,7 @@ static int probe_crash(int null) {
 
 static int usage(const char *argv0) {
     fprintf(stderr, "usage: %s [--exefs DIR] [--romfs DIR] [--profile DIR] [--selftest | --probe-loader | "
-                    "--probe-engage-input | --probe-audout | --probe-menu-font | --probe-cfg | --probe-dpi | --probe-kernel | --probe-ipc | --probe-services | --probe-fs | --probe-gfx-abi | "
+                    "--probe-engage-input | --probe-audout | --probe-menu-font | --probe-cfg | --probe-dpi | --probe-kernel | --probe-ipc | --probe-services | --probe-fs | --probe-engage-fs | --probe-mods | --probe-gfx-abi | "
                     "--probe-nvn | --probe-nvn-tex | --probe-window | --probe-shader | --probe-vkmem | "
                     "--probe-vkexec | --probe-astc | --probe-movie | --probe-crash-call | --probe-crash-null | "
                     "--prepare-shaders | --warm-shaders | --boot |--seconds S [--shot PNG]]\n", argv0);
@@ -567,6 +568,7 @@ int main(int argc, char **argv) {
     if (!strcmp(mode, "--probe-services")) return probe_services();
     if (!strcmp(mode, "--probe-fs")) return probe_fs();
     if (!strcmp(mode, "--probe-engage-fs")) return probe_engage_fs();
+    if (!strcmp(mode, "--probe-mods")) return probe_mods();
     if (!strcmp(mode, "--probe-gfx-abi")) return probe_gfx_abi();
     if (!strcmp(mode, "--probe-nvn")) return probe_nvn();
     if (!strcmp(mode, "--probe-nvn-tex")) return probe_nvn_tex();

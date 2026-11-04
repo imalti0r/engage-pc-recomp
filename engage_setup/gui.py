@@ -2,6 +2,7 @@
 import argparse
 import os
 import subprocess
+import sys
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
 
@@ -78,12 +79,55 @@ class App(BaseApp):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--selftest', action='store_true')
+    parser.add_argument('--setup', action='store_true', help='Open the setup wizard directly')
+    parser.add_argument('--dest', help='Select an existing game installation')
+    parser.add_argument('--shots', help='Write launcher screenshots during --selftest (requires Pillow)')
+    parser.add_argument('--apply-update', action='store_true', help='Finish a user-approved update of the selected install')
     args = parser.parse_args()
+    paths = layout()
+    if not paths.dev and not args.selftest:
+        from .updates import redirect_target
+        target = redirect_target(paths.root)
+        if target:
+            subprocess.Popen([str(target), *sys.argv[1:]], cwd=target.parent)
+            return
     fix_tcl_paths()
     root = tk.Tk()
-    app = App(root, 'en', layout())
+    if args.setup:
+        app = App(root, 'en', paths)
+        if args.dest:
+            app.vars['dest'].set(args.dest)
+    else:
+        try:
+            from .launcher_gui import Launcher
+            app = Launcher(root, paths, args.dest, remember=not args.selftest, apply_update=args.apply_update)
+        except (ImportError, OSError, RuntimeError) as error:
+            messagebox.showerror('Launcher could not start',
+                'Extract the entire setup ZIP, keeping its files together, then try again.\n\n' + str(error), parent=root)
+            root.destroy()
+            return
     if args.selftest:
-        root.after(1500, root.destroy)
+        if args.shots and not args.setup:
+            from pathlib import Path
+            from PIL import ImageGrab
+            output = Path(args.shots)
+            output.mkdir(parents=True, exist_ok=True)
+            pages = iter(app.pages)
+            def capture():
+                try:
+                    page = next(pages)
+                except StopIteration:
+                    root.destroy()
+                    return
+                app.show(page)
+                def shot():
+                    x, y = root.winfo_rootx(), root.winfo_rooty()
+                    ImageGrab.grab(bbox=(x, y, x + root.winfo_width(), y + root.winfo_height())).save(output / f'launcher-{page}.png')
+                    root.after(200, capture)
+                root.after(150, shot)
+            root.after(600, capture)
+        else:
+            root.after(1500, root.destroy)
     root.mainloop()
 
 

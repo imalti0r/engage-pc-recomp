@@ -114,10 +114,14 @@ class SetupTest(unittest.TestCase):
             (root / 'profile').mkdir()
             save = root / 'profile/keep-save'
             save.write_bytes(b'keep')
+            mod = root / 'mods/keep-mod/romfs/file'
+            mod.parent.mkdir(parents=True)
+            mod.write_bytes(b'keep mod')
             pipeline.prepare()
             pipeline.prepare()
             self.assertEqual(settings.read_text(), 'volume = 37\n')
             self.assertEqual(save.read_bytes(), b'keep')
+            self.assertEqual(mod.read_bytes(), b'keep mod')
             self.assertTrue((root / 'engage.exe').exists())
             self.assertTrue((root / 'romfs-index.bin').exists())
             self.assertTrue((root / 'engage_game.dll').exists())

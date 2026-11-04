@@ -99,7 +99,10 @@ class Form(BaseForm):
 def layout(root=None):
     root = Path(root or Path(__file__).resolve().parents[1]).resolve()
     dev = not (root / 'python/python.exe').is_file()
+    channel_path = root / 'BUILD_CHANNEL'
+    channel = channel_path.read_text().strip() if channel_path.is_file() else 'dev' if dev else 'release'
     return SimpleNamespace(root=root, dev=dev, release=(root / 'VERSION').read_text().strip(),
+        channel=channel,
         python=root / '.venv-py314/Scripts/python.exe' if dev else root / 'python/python.exe',
         runtime=root / 'runtime', llvm=root / 'toolchain/engage/llvm' if dev else root / 'llvm',
         deps=root / 'toolchain/engage/runtime/deps' if dev else root / 'runtime/deps',
