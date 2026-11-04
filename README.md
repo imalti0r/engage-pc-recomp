@@ -14,7 +14,7 @@ A native Windows port of **Fire Emblem Engage 2.0.0**, built on [TotK Recomp](ht
 Setup works much like TotK Recomp: pick your files, let it build, then play. Python, the compiler and the extractor are included, so you don't need to install those yourself.
 
 1. Download the Windows setup ZIP above and extract the whole thing.
-2. Open **Engage-Setup.exe**. Select your base game, **2.0.0** update, keys and extracted firmware folder. Both DLCs are optional.
+2. Open **Engage-Launcher.exe** and choose **Setup / Update**. Select your base game, **2.0.0** update, keys and extracted firmware folder. Both DLCs are optional.
 3. Pick an empty install folder with **40 GiB free** and click **Install Engage**.
 4. Once it's done, click **Play Engage**. Next time, double-click **engage.exe** in that folder or create a Windows shortcut to it. **F1** opens settings. The CMD file is optional for troubleshooting.
 

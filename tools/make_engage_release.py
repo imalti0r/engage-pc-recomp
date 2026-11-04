@@ -148,8 +148,8 @@ def build(out, channel='dev'):
     work.mkdir(exist_ok=True)
     (work / 'launcher.rc').write_text(f'1 ICON "{(out / "runtime/engage-setup.ico").as_posix()}"\n1 24 "{(ROOT / "runtime/totk.manifest").as_posix()}"\n')
     upstream.run([out / 'llvm/bin/llvm-windres.exe', work / 'launcher.rc', '-O', 'coff', '-o', work / 'launcher.o'])
-    upstream.run([clang, '-O2', '-mwindows', '-municode', ROOT / 'engage_setup/launcher_win.c', work / 'launcher.o', '-o', out / 'Engage-Setup.exe'])
-    shutil.copy2(out / 'Engage-Setup.exe', out / 'Engage-Launcher.exe')
+    upstream.run([clang, '-O2', '-mwindows', '-municode', ROOT / 'engage_setup/launcher_win.c', work / 'launcher.o', '-o', out / 'Engage-Launcher.exe'])
+    (out / 'Engage-Setup.exe').unlink(missing_ok=True)
     runtime_build = ROOT / 'build/release/engage-public-runtime'
     upstream.run([out / 'python/python.exe', '-I', out / 'tools/build_engage.py', '--runtime-only',
                   '--out', runtime_build, '--runtime', out / 'runtime', '--toolchain', out / 'llvm',
@@ -163,7 +163,7 @@ def build(out, channel='dev'):
         '3. Choose your own base game, update 2.0.0, prod.keys and extracted firmware folder.\n'
         '4. Optionally add either DLC package and title.keys, then choose a separate install folder.\n'
         '5. Select Install. When it finishes, select Play Engage.\n'
-        '6. Use the launcher for settings, RomFS mods and save backups. Engage-Setup.exe opens the same launcher.\n\n'
+        '6. Use the launcher for settings, RomFS mods and save backups.\n\n'
         'Requirements: Windows 10/11 x64, AVX2 CPU, Vulkan 1.3 GPU/driver, 40 GiB free.\n'
         'Setup builds engage_game.dll locally and uses the included public runtime. No game files or keys are included.\n'
         'First install may take 20–60 minutes. Shaders cache during play.\n'

@@ -1,7 +1,7 @@
 # Engage launcher (development build)
 
-The development setup bundle opens `Engage-Launcher.exe`. `Engage-Setup.exe`
-opens the same app for compatibility. Keep the entire bundle together. The
+The development setup bundle opens `Engage-Launcher.exe` for both Play and
+Setup / Update. Keep the entire bundle together. The
 published alpha.5 setup does not contain this launcher yet.
 
 The version pill at the top left reads `DEV · <version>` in a development
