@@ -27,6 +27,9 @@ class Launcher:
         self.update_cancel = None
         self.state_path = Path(os.environ.get('APPDATA', Path.home())) / 'Engage PC Recomp/launcher.json'
         if not dest:
+            from .installed_launcher import installed_game
+            dest = installed_game(layout.root)
+        if not dest:
             try:
                 saved = json.loads(self.state_path.read_text())
                 dest = saved.get('install') if isinstance(saved, dict) else None
@@ -607,6 +610,7 @@ class Launcher:
         if self.dest:
             app.vars['dest'].set(str(self.dest))
         self.wizard_app = app
+        app.on_installed = self.root.destroy
         app.play_button.configure(command=self.play_after_setup)
         self.status.set('Setup / Update is open in its own window. Refresh here when it finishes.')
 

@@ -25,7 +25,7 @@ Python, the compiler and the extractor come with setup. You don't need to instal
 1. Download the [Windows setup ZIP](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.5/downloads/Engage-Setup-0.1.0-alpha.5-windows.zip) and **extract the entire ZIP**. Keep its files and folders together. Checksums are on the [release page](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.5).
 2. Run **Engage-Launcher.exe**, choose **Setup / Update**, and fill in the file paths. Make sure the update is **2.0.0**. For firmware, pick the folder with the NCA files inside, not the ZIP. Add either DLC and `title.keys` if needed.
 3. Pick a separate, empty install folder, like `D:\Games\Engage`, then click **Install Engage**. Allow around 20–60 minutes the first time. Your CPU and drive will affect how long it takes.
-4. When setup finishes, click **Play Engage**. After that, double-click **engage.exe** in your install folder, or create a Windows shortcut to it. Press **F1** for settings and controls. **Play Engage.cmd** is optional for troubleshooting.
+4. When setup finishes, it switches to **Engage-Launcher.exe** in your game folder. You can delete the original extracted setup folder. Use this installed launcher to play, change settings, manage mods or run **Setup / Update**. Keep its `.launcher` folder with the game. Press **F1** for in-game settings and controls. **Play Engage.cmd** is optional for troubleshooting.
 
 Your original dumps aren't changed. The installed game icon and shared fonts come from your files. Keep the built game private—it contains game code.
 

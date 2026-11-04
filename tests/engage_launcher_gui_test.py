@@ -14,6 +14,26 @@ sys.path.insert(0, str(ROOT))
 
 @unittest.skipUnless(os.name == 'nt', 'Windows desktop launcher')
 class LauncherGuiTest(unittest.TestCase):
+    def test_successful_setup_switches_to_installed_launcher_before_closing_parent(self):
+        self.app.setup()
+        wizard = self.app.wizard_app
+        wizard.model.dest = str(self.dest)
+        events = []
+        wizard.on_installed = lambda: events.append('closed')
+        with patch('engage_setup.installed_launcher.open_installed', side_effect=lambda dest: events.append('opened')):
+            wizard.open_installed_launcher()
+        self.assertEqual(events, ['opened', 'closed'])
+
+    def test_failed_handoff_keeps_original_launcher_open(self):
+        self.app.setup()
+        wizard = self.app.wizard_app
+        wizard.model.dest = str(self.dest)
+        with patch('engage_setup.installed_launcher.open_installed', side_effect=OSError('synthetic start failure')), \
+             patch('engage_setup.gui.messagebox.showerror') as error, patch.object(self.root, 'destroy') as close:
+            wizard.open_installed_launcher()
+        close.assert_not_called()
+        error.assert_called_once()
+
     def setUp(self):
         import tkinter as tk
         from engage_setup.launcher_gui import Launcher

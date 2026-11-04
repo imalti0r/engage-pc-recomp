@@ -35,7 +35,9 @@ def write_json(path, data):
 def validate_destination(dest, inputs, root):
     dest = dest.resolve()
     root = Path(root).resolve()
-    if dest == Path(dest.anchor) or dest == root or root.is_relative_to(dest) or dest.is_relative_to(root):
+    from .installed_launcher import installed_game
+    own_launcher = installed_game(root) == dest
+    if dest == Path(dest.anchor) or dest == root or (root.is_relative_to(dest) and not own_launcher) or dest.is_relative_to(root):
         raise ValueError('Choose a separate install folder outside the setup package.')
     if any(p.resolve() == dest or p.resolve().is_relative_to(dest) or dest.is_relative_to(p.resolve()) for p in inputs):
         raise ValueError('Keep the install folder separate from your input files and firmware.')
@@ -352,6 +354,10 @@ class Pipeline:
                 self.state['done'].append(step)
                 write_json(self.dest / 'engage-install.json', self.state)
                 self.reporter.step(step, 'done')
+            if not getattr(self.paths, 'dev', True):
+                self.reporter.log('Installing the launcher and setup tools beside the game…')
+                from .installed_launcher import install_launcher
+                install_launcher(self.paths.root, self.dest)
         self.reporter.emit('end', result='ok', seconds=self.reporter.elapsed())
 
     def reuse_exefs(self):

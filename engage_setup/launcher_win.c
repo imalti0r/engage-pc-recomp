@@ -17,6 +17,23 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR arguments, int
     if (!n) goto fail;
     folder[n - 1] = 0;
     int written = swprintf(python, 32768, L"%ls\\python\\pythonw.exe", folder);
+    if (written >= 0 && written < 32768 && GetFileAttributesW(python) == INVALID_FILE_ATTRIBUTES) {
+        // Installed games keep complete, immutable launcher packages in .launcher/<inventory hash>.
+        written = swprintf(python, 32768, L"%ls\\launcher-current.txt", folder);
+        if (written < 0 || written >= 32768) goto fail;
+        HANDLE file = CreateFileW(python, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+        if (file == INVALID_HANDLE_VALUE) goto fail;
+        char identity[65] = {0}; DWORD bytes = 0;
+        BOOL valid = GetFileSize(file, NULL) == 64 && ReadFile(file, identity, 64, &bytes, NULL) && bytes == 64;
+        CloseHandle(file);
+        if (!valid) goto fail;
+        for (int i = 0; i < 64; i++)
+            if (!((identity[i] >= '0' && identity[i] <= '9') || (identity[i] >= 'a' && identity[i] <= 'f'))) goto fail;
+        written = swprintf(python, 32768, L"%ls\\.launcher\\%hs", folder, identity);
+        if (written < 0 || written >= 32768) goto fail;
+        wcscpy(folder, python);
+        written = swprintf(python, 32768, L"%ls\\python\\pythonw.exe", folder);
+    }
     if (written < 0 || written >= 32768 || GetFileAttributesW(python) == INVALID_FILE_ATTRIBUTES) goto fail;
     written = swprintf(command, 32768, L"\"%ls\" -I -m engage_setup.gui %ls", python, arguments);
     if (written < 0 || written >= 32768) goto fail;

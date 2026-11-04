@@ -14,8 +14,13 @@ When no game is selected, **Set up Engage** offers **Use existing install**
 (a folder containing `engage.exe` and `romfs-index.bin`) or **Set up from my game
 files**. **Settings → Choose game folder** can switch installations later.
 The installer opens in its own window and retains its existing input validation,
-progress, recovery and update behavior. After setup finishes, **Play Engage**
-returns to the launcher and starts the game.
+progress, recovery and update behavior. Packaged Setup installs `Engage-Launcher.exe`
+beside the game and keeps the launcher, Python, extractor and rebuild tools in
+`.launcher/` inside the game folder. Once these files are verified, Setup opens
+the installed launcher and closes the original launcher/setup windows. The
+completion message explains that the original extracted setup folder can be
+deleted. Use the game folder's `Engage-Launcher.exe` for Play, settings, mods and
+Setup / Update. Keep `.launcher/` with the game; source checkouts remain in place.
 
 Play requests foreground focus for the game while the launcher stays open behind
 it. Settings, mod changes and save

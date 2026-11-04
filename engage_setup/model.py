@@ -20,7 +20,7 @@ TEXT = {
     'ui.need_update': 'Choose the Engage 2.0.0 update.',
     'ui.need_firmware': 'Choose an extracted firmware NCA folder.',
     'ui.missing_firmware': 'The firmware folder does not exist.',
-    'ui.done_text': 'Engage is installed in {dest}. Select Play Engage to start.\nKeep this setup package if you need to rebuild. Your original dumps are unchanged.',
+    'ui.done_text': 'Engage is installed in {dest}. Select Play Engage to start. Your original dumps are unchanged.',
     'ui.update_mode': 'This folder contains an unfinished Engage installation. Setup will resume it.\nUse the same input files you used before.',
     'ui.update_ready': 'Update mode: this folder already has Engage installed.\nLeave every file field empty and click Update Engage. Your saves and settings are kept, and the game is not extracted again.',
     'ui.update_start': 'Update Engage',
