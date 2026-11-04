@@ -5,15 +5,13 @@ A native Windows port of **Fire Emblem Engage 2.0.0**, built on [TotK Recomp](ht
 [![Source checks](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/badges/main/pipeline.svg)](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/pipelines)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-[Download Windows Setup](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.5/downloads/Engage-Setup-0.1.0-alpha.5-windows.zip) · [Setup guide](docs/installing-engage.md) · [Report a bug](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/issues/new) · [Build from source](docs/building-engage.md)
+[Download Windows Setup](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.6/downloads/Engage-Setup-0.1.0-alpha.6-windows.zip) · [Setup guide](docs/installing-engage.md) · [Report a bug](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/issues/new) · [Build from source](docs/building-engage.md)
 
 **This is still an early alpha.** The first battle, attack cutscenes and audio work, but the full game hasn't been tested. Expect bugs, and back up your saves.
 
 ## Installing
 
 The launcher handles installation, Play, settings, RomFS mods, save backups and updates. Python, the compiler and the extractor are included.
-
-**The screenshots and launcher instructions below describe `dev`.** The linked alpha.5 download uses the older `Engage-Setup.exe` and does not include these launcher features. Merging into `dev` does not publish a new installer; use a launcher-enabled test build until the next release.
 
 ![Engage launcher with Play, Mods, Saves and Settings](docs/screenshots/launcher.png)
 

@@ -1,8 +1,8 @@
-# Engage launcher (development build)
+# Engage launcher
 
-The development setup bundle opens `Engage-Launcher.exe` for both Play and
+The setup bundle opens `Engage-Launcher.exe` for both Play and
 Setup / Update. Keep the entire bundle together. The
-published alpha.5 setup does not contain this launcher yet.
+alpha.5 and earlier setups do not contain this launcher.
 
 The version pill at the top left reads `DEV · <version>` in a development
 candidate and `v<version>` in a release ZIP. It describes the launcher package;

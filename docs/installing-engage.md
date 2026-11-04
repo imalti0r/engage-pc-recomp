@@ -1,6 +1,6 @@
 # Setting up Engage PC Recomp
 
-[Published Windows releases](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases). This guide describes the launcher-enabled development build. The published **alpha.5** download still uses **Engage-Setup.exe** and does not include the launcher, automatic updates or installed-copy handoff shown here. These features need a launcher-enabled test build until a new release is published.
+[Published Windows releases](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases). This guide describes the alpha.6 launcher. Older alpha.5 and earlier downloads use **Engage-Setup.exe** and lack the launcher, automatic updates and installed-copy handoff.
 
 This is still an alpha. Clean Windows installs and the full game remain unverified.
 
@@ -24,7 +24,7 @@ Python, the compiler and the extractor come with setup. You don't need to instal
 
 ![Engage launcher before installation](screenshots/launcher.png)
 
-1. Obtain a launcher-enabled Windows setup ZIP and **extract the entire ZIP**. Keep its files and folders together. For published packages, compare the ZIP with the release's `SHA256SUMS`. The older alpha.5 package uses `Engage-Setup.exe`; the steps below describe the development launcher.
+1. Download the alpha.6 Windows setup ZIP and **extract the entire ZIP**. Keep its files and folders together. For published packages, compare the ZIP with the release's `SHA256SUMS`. The older alpha.5 package uses `Engage-Setup.exe`; the steps below describe the launcher.
 2. Run **Engage-Launcher.exe**, choose **Setup / Update**, and fill in the file paths. Make sure the update is **2.0.0**. For firmware, pick the folder with the NCA files inside, not the ZIP. Add either DLC and `title.keys` if needed.
 3. Pick a separate, empty install folder, like `D:\Games\Engage`, then click **Install Engage**. Allow around 20–60 minutes the first time. Your CPU and drive will affect how long it takes.
 4. When setup finishes, it switches to **Engage-Launcher.exe** in your game folder. You can delete the original extracted setup folder. Use this installed launcher to play, change settings, manage mods or run **Setup / Update**. Keep its `.launcher` folder with the game. Press **F1** for in-game settings and controls. **Play Engage.cmd** is optional for troubleshooting.
