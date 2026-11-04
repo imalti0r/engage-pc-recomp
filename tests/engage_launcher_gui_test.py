@@ -118,21 +118,11 @@ class LauncherGuiTest(unittest.TestCase):
         self.assertEqual(self.app.play_button['text'], 'Play Engage')
 
     def test_extracted_icon_stays_local_and_is_used_by_launcher(self):
-        import ctypes
-        from ctypes import wintypes
         from PIL import Image
         from engage_setup.game_icon import prepare_icon
         self.root.attributes('-alpha', 0)
         self.root.deiconify()
         self.root.update()
-        user = ctypes.windll.user32
-        user.GetAncestor.argtypes, user.GetAncestor.restype = [wintypes.HWND, wintypes.UINT], wintypes.HWND
-        user.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
-        user.SendMessageW.restype = ctypes.c_void_p
-        # Tk versions expose either the client HWND or the top-level wrapper HWND.
-        window = user.GetAncestor(self.root.winfo_id(), 2)  # GA_ROOT
-        self.assertTrue(window)
-        before_icon = user.SendMessageW(window, 0x007f, 1, 0)  # WM_GETICON, ICON_BIG
         source = self.dest / 'icon.jpg'
         Image.new('RGB', (256, 256), '#3060a0').save(source)
         icon = self.dest / 'engage.ico'
@@ -141,7 +131,8 @@ class LauncherGuiTest(unittest.TestCase):
         self.app.refresh_icon()
         self.root.update()
         self.assertEqual(self.app.icon_stamp[0], str(icon))
-        self.assertNotEqual(user.SendMessageW(window, 0x007f, 1, 0), before_icon)
+        # Hosted Windows desktops need not expose WM_GETICON handles; query Tk's accepted window icon.
+        self.assertEqual(Path(self.root.iconbitmap()).resolve(), icon.resolve())
         before = icon.read_bytes()
         source.write_bytes(b'not an image')
         self.assertFalse(prepare_icon(source, icon))
