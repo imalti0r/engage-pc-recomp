@@ -126,10 +126,12 @@ class LauncherGuiTest(unittest.TestCase):
         self.root.deiconify()
         self.root.update()
         user = ctypes.windll.user32
-        user.GetParent.argtypes, user.GetParent.restype = [wintypes.HWND], wintypes.HWND
+        user.GetAncestor.argtypes, user.GetAncestor.restype = [wintypes.HWND, wintypes.UINT], wintypes.HWND
         user.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
         user.SendMessageW.restype = ctypes.c_void_p
-        window = user.GetParent(self.root.winfo_id())
+        # Tk versions expose either the client HWND or the top-level wrapper HWND.
+        window = user.GetAncestor(self.root.winfo_id(), 2)  # GA_ROOT
+        self.assertTrue(window)
         before_icon = user.SendMessageW(window, 0x007f, 1, 0)  # WM_GETICON, ICON_BIG
         source = self.dest / 'icon.jpg'
         Image.new('RGB', (256, 256), '#3060a0').save(source)
@@ -137,6 +139,7 @@ class LauncherGuiTest(unittest.TestCase):
         self.assertTrue(prepare_icon(source, icon))
         self.assertEqual(icon.read_bytes()[:4], b'\x00\x00\x01\x00')
         self.app.refresh_icon()
+        self.root.update()
         self.assertEqual(self.app.icon_stamp[0], str(icon))
         self.assertNotEqual(user.SendMessageW(window, 0x007f, 1, 0), before_icon)
         before = icon.read_bytes()
