@@ -128,11 +128,14 @@ class LauncherGuiTest(unittest.TestCase):
         icon = self.dest / 'engage.ico'
         self.assertTrue(prepare_icon(source, icon))
         self.assertEqual(icon.read_bytes()[:4], b'\x00\x00\x01\x00')
-        self.app.refresh_icon()
+        with patch.object(self.root, 'iconbitmap', wraps=self.root.iconbitmap) as set_icon:
+            self.app.refresh_icon()
+            set_icon.assert_called_once_with(str(icon))
         self.root.update()
         self.assertEqual(self.app.icon_stamp[0], str(icon))
-        # Hosted Windows desktops need not expose WM_GETICON handles; query Tk's accepted window icon.
-        self.assertEqual(Path(self.root.iconbitmap()).resolve(), icon.resolve())
+        with Image.open(icon) as image:
+            self.assertEqual(image.format, 'ICO')
+            self.assertEqual(image.size, (256, 256))
         before = icon.read_bytes()
         source.write_bytes(b'not an image')
         self.assertFalse(prepare_icon(source, icon))
