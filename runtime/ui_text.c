@@ -305,7 +305,7 @@ static const char *const text_en[UI_TEXT_COUNT] = {
     [UI_MENU_OV_SCALING] = "Scaling", [UI_MENU_OV_LIMIT] = "Frame limit", [UI_MENU_OV_PRESENT] = "Presentation",
     [UI_MENU_OV_FMT_SIZE] = "%ux%u", [UI_MENU_OV_FMT_SCENE] = "%ux%u, %.0f%%",
     [UI_MENU_OV_FMT_FSR] = "AMD FSR 1, sharpness %d%%", [UI_MENU_OV_SCALE_NONE] = "none (1:1)",
-    [UI_MENU_OV_FMT_DLSS] = "NVIDIA DLSS, %s",
+    [UI_MENU_OV_FMT_DLSS] = "NVIDIA DLSS, %s", [UI_MENU_OV_FMT_DLSS_OFF] = "NVIDIA DLSS off, %s", [UI_MENU_OV_DLSS_SIZE] = "DLSS render", [UI_MENU_OV_FMT_DLSS_SIZE] = "%ux%u -> %ux%u",
     [UI_MENU_OV_SCALE_BILINEAR] = "bilinear",
 };
 
@@ -594,7 +594,7 @@ static const char *const text_ru[UI_TEXT_COUNT] = {
     [UI_MENU_OV_SCALING] = "Масштабирование", [UI_MENU_OV_LIMIT] = "Лимит кадров", [UI_MENU_OV_PRESENT] = "Вывод кадров",
     [UI_MENU_OV_FMT_SIZE] = "%ux%u", [UI_MENU_OV_FMT_SCENE] = "%ux%u, %.0f%%",
     [UI_MENU_OV_FMT_FSR] = "AMD FSR 1, резкость %d%%", [UI_MENU_OV_SCALE_NONE] = "нет (1:1)",
-    [UI_MENU_OV_FMT_DLSS] = "NVIDIA DLSS, %s",
+    [UI_MENU_OV_FMT_DLSS] = "NVIDIA DLSS, %s", [UI_MENU_OV_FMT_DLSS_OFF] = "NVIDIA DLSS off, %s", [UI_MENU_OV_DLSS_SIZE] = "DLSS render", [UI_MENU_OV_FMT_DLSS_SIZE] = "%ux%u -> %ux%u",
     [UI_MENU_OV_SCALE_BILINEAR] = "билинейное",
 };
 
@@ -861,7 +861,7 @@ static const char *const text_zh_hans[UI_TEXT_COUNT] = {
     [UI_MENU_OV_SCALING] = "缩放", [UI_MENU_OV_LIMIT] = "帧率上限", [UI_MENU_OV_PRESENT] = "呈现",
     [UI_MENU_OV_FMT_SIZE] = "%ux%u", [UI_MENU_OV_FMT_SCENE] = "%ux%u，%.0f%%",
     [UI_MENU_OV_FMT_FSR] = "AMD FSR 1，锐化 %d%%", [UI_MENU_OV_SCALE_NONE] = "无（1:1）",
-    [UI_MENU_OV_FMT_DLSS] = "NVIDIA DLSS，%s",
+    [UI_MENU_OV_FMT_DLSS] = "NVIDIA DLSS，%s", [UI_MENU_OV_FMT_DLSS_OFF] = "NVIDIA DLSS 未启用，%s", [UI_MENU_OV_DLSS_SIZE] = "DLSS 渲染分辨率", [UI_MENU_OV_FMT_DLSS_SIZE] = "%ux%u → %ux%u",
     [UI_MENU_OV_SCALE_BILINEAR] = "双线性",
 };
 SWKBD_ONLY(text_zh_hant, "文字輸入", "請輸入名字", "馬兒", "確定", "取消", "手把：A 確定，B 取消");

@@ -173,6 +173,9 @@ typedef enum {
     UI_MENU_OV_FMT_SCENE,     // "%ux%u, %.0f%%": the scene and its share of the game image's width
     UI_MENU_OV_FMT_FSR,       // "AMD FSR 1, sharpness %d%%"
     UI_MENU_OV_FMT_DLSS,      // "NVIDIA DLSS, %s" (the mode)
+    UI_MENU_OV_FMT_DLSS_OFF,  // "NVIDIA DLSS off, %s" (why it fell back)
+    UI_MENU_OV_DLSS_SIZE,     // "DLSS render"
+    UI_MENU_OV_FMT_DLSS_SIZE, // "%ux%u -> %ux%u" (DLSS render -> its output)
     UI_MENU_OV_SCALE_NONE, UI_MENU_OV_SCALE_BILINEAR,
     UI_MENU_LAST_ID = UI_MENU_OV_SCALE_BILINEAR,
     UI_TEXT_COUNT

@@ -55,6 +55,9 @@ class App:
         self.run_args = run_args or {}   # extra CLI options for tests: temp, verify
         self.log_entries = []            # events and raw lines of the run, rendered by render_log
         self.bound = []                  # (widget, option, id, params) retranslated on a language switch
+        # text wraps at the design width scaled for this display, so a 150 % screen keeps the layout
+        self.dpi = getattr(root, '_engage_dpi_factor', 1.0) or 1.0
+        self.wrap = int(round(620 * self.dpi))
         self.vars = {n: tk.StringVar() for n in ('base', 'update', 'keys', 'dest')}
         self.vars['lang'] = tk.StringVar()
         self.lang_code = default_game_language(ui_lang)
@@ -174,7 +177,7 @@ class App:
         self.root.geometry(f'{max(w, self.root.winfo_width())}x{max(h, self.root.winfo_height())}')
 
     def notice(self, parent):
-        w = ttk.Label(parent, style='Notice.TLabel', wraplength=620, justify='left')
+        w = ttk.Label(parent, style='Notice.TLabel', wraplength=self.wrap, justify='left')
         self.bind_text(w, 'text', 'ui.notice')
         return w
 
@@ -184,7 +187,7 @@ class App:
         bar.pack(side='bottom', fill='x', pady=(12, 0))
         self.start_button = self.button(bar, 'ui.start', self.start)
         self.start_button.pack(side='right')
-        self.form_intro = self.label(f, 'ui.intro', wraplength=620, justify='left')
+        self.form_intro = self.label(f, 'ui.intro', wraplength=self.wrap, justify='left')
         self.form_intro.pack(anchor='w', pady=(0, 8))
         self.notice(f).pack(fill='x', pady=(0, 10))
         grid = ttk.Frame(f)
@@ -210,11 +213,11 @@ class App:
         self.label(grid, 'ui.dest').grid(row=i + 1, column=0, sticky='w', pady=4)
         ttk.Entry(grid, textvariable=self.vars['dest']).grid(row=i + 1, column=1, sticky='ew', pady=4)
         self.button(grid, 'ui.browse', self.pick_dest).grid(row=i + 1, column=2, padx=(8, 0))
-        self.update_hint = ttk.Label(f, wraplength=620, justify='left')
+        self.update_hint = ttk.Label(f, wraplength=self.wrap, justify='left')
         self.update_hint.pack(anchor='w', pady=(8, 0))
-        self.form_error = ttk.Label(f, style='Err.TLabel', wraplength=620, justify='left')
+        self.form_error = ttk.Label(f, style='Err.TLabel', wraplength=self.wrap, justify='left')
         self.form_error.pack(anchor='w', pady=(8, 0))
-        self.label(f, 'ui.keys_private', wraplength=620, justify='left').pack(anchor='w', pady=(8, 0))
+        self.label(f, 'ui.keys_private', wraplength=self.wrap, justify='left').pack(anchor='w', pady=(8, 0))
         return f
 
     def build_run(self):
@@ -230,13 +233,13 @@ class App:
         self.step_rows = {}
         self.steps_box = ttk.Frame(f)
         self.steps_box.pack(fill='x', pady=(8, 8))
-        self.phase_label = ttk.Label(f, wraplength=620, justify='left')
+        self.phase_label = ttk.Label(f, wraplength=self.wrap, justify='left')
         self.phase_label.pack(anchor='w')
         self.bar = ttk.Progressbar(f, mode='determinate', maximum=1000)
         self.bar.pack(fill='x', pady=(4, 6))
-        self.space_label = ttk.Label(f, wraplength=620, justify='left')
+        self.space_label = ttk.Label(f, wraplength=self.wrap, justify='left')
         self.space_label.pack(anchor='w')
-        self.warn_label = ttk.Label(f, wraplength=620, justify='left', foreground='#9a6700')
+        self.warn_label = ttk.Label(f, wraplength=self.wrap, justify='left', foreground='#9a6700')
         self.warn_label.pack(anchor='w')
         self.log_frame = ttk.Frame(f)
         self.log = tk.Text(self.log_frame, height=10, wrap='word', state='disabled', font=(self.mono_font, 9))
@@ -256,9 +259,9 @@ class App:
         self.open_button.pack(side='right', padx=(0, 8))
         self.back_button = self.button(bar, 'ui.back', lambda: self.show('form'))
         self.back_button.pack(side='left')
-        self.finish_title = ttk.Label(f, style='Title.TLabel', wraplength=620, justify='left')
+        self.finish_title = ttk.Label(f, style='Title.TLabel', wraplength=self.wrap, justify='left')
         self.finish_title.pack(anchor='w')
-        self.finish_text = ttk.Label(f, wraplength=620, justify='left')
+        self.finish_text = ttk.Label(f, wraplength=self.wrap, justify='left')
         self.finish_text.pack(anchor='w', pady=(8, 8))
         self.finish_steps = ttk.Frame(f)
         self.finish_steps.pack(fill='x', pady=(0, 8))

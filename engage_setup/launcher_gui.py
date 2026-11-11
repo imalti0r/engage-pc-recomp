@@ -45,8 +45,9 @@ class Launcher:
         self.setting_vars, self.settings_loaded, self.mod_rows = {}, {}, {}
         self.icon_stamp = None
         root.title('Engage PC Recomp')
-        root.geometry('1120x710')
-        root.minsize(980, 650)
+        from .dpi import scaled
+        root.geometry('%dx%d' % scaled(root, (1120, 710)))
+        root.minsize(*scaled(root, (980, 650)))
         root.configure(bg=BG)
         icon = layout.runtime / 'engage-setup.ico'
         if os.name == 'nt' and icon.is_file():

@@ -75,6 +75,8 @@ struct Sl {
     int (*hook_after_present)() = nullptr;
     int hooks_tried = 0;
     int sl_failed = 0;   // a start attempt already failed this session (the log says why)
+    // why DLSS draws nothing right now, for the overlay: "" while it runs, a short reason otherwise
+    const char *blocked = "";
 };
 
 Sl &sl_state() {
@@ -204,6 +206,7 @@ static int sl_start(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, unsign
                "sl.dlss.dll, nvngx_dlss.dll) in upscalers\\streamline next to the game, or name their folder in "
                "TOTK_DLSS_DIR; FSR keeps the present",
                narrow(dll).c_str());
+        s.blocked = "Streamline files missing";
         return 0;
     }
     std::string missing;
@@ -212,15 +215,18 @@ static int sl_start(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, unsign
     if (!missing.empty()) {
         rt_log("vk: DLSS selected but %s lacks %s: copy all four Streamline files there; FSR keeps the present",
                narrow(dir).c_str(), missing.c_str());
+        s.blocked = "Streamline files missing";
         return 0;
     }
     if (!sl::security::verifyEmbeddedSignature(dll.c_str())) {
         rt_log("vk: %s has no valid NVIDIA signature: not loaded", narrow(dll).c_str());
+        s.blocked = "Streamline DLL unsigned";
         return 0;
     }
     s.mod = LoadLibraryW(dll.c_str());
     if (!s.mod) {
         rt_log("vk: LoadLibrary(%s) failed (error %lu)", narrow(dll).c_str(), GetLastError());
+        s.blocked = "Streamline DLL would not load";
         return 0;
     }
     auto get = [&](const char *n) { return reinterpret_cast<void *>(GetProcAddress(s.mod, n)); };
@@ -234,6 +240,7 @@ static int sl_start(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, unsign
     s.shutdown = reinterpret_cast<PFun_slShutdown *>(get("slShutdown"));
     if (!s.init || !s.supported || !s.token || !s.constants || !s.tag || !s.evaluate || !s.feature_fn) {
         rt_log("vk: sl.interposer.dll lacks the Streamline API");
+        s.blocked = "Streamline API missing";
         return 0;
     }
     static const wchar_t *paths[1];
@@ -268,15 +275,18 @@ static int sl_start(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, unsign
     g_sl_guard = 0;
     if (veh) RemoveVectoredExceptionHandler(veh);
     if (r != sl::Result::eOk) {
+        s.blocked = escaped ? "Streamline init crashed" : "Streamline init failed";
         if (escaped)
             rt_log("vk: Streamline init crashed (guarded); DLSS stays off this session, FSR keeps the present");
         else
             rt_log("vk: slInit failed (%d): DLSS off", (int)r);
+            s.blocked = "Streamline init failed";
         return 0;
     }
     auto set_info = reinterpret_cast<PFun_slSetVulkanInfo *>(GetProcAddress(s.mod, "slSetVulkanInfo"));
     if (!set_info) {
         rt_log("vk: DLSS off: sl.interposer.dll has no slSetVulkanInfo");
+        s.blocked = "Streamline API missing";
         return 0;
     }
     sl::VulkanInfo info;
@@ -292,9 +302,11 @@ static int sl_start(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, unsign
     r = set_info(info);
     if (r != sl::Result::eOk) {
         rt_log("vk: slSetVulkanInfo failed (%d): DLSS off", (int)r);
+        s.blocked = "Streamline rejected the device";
         return 0;
     }
     s.started = true;
+    s.blocked = "";   // running now
     rt_log("vk: Streamline %d.%d.%d started with the device (family %u, index %u), no interposer hooks",
            SL_VERSION_MAJOR, SL_VERSION_MINOR, SL_VERSION_PATCH, gfx_family, gfx_index);
     return 1;
@@ -309,6 +321,9 @@ void vk_dlss_set_device(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, un
 
 // ---- (the interposer-hook mode was removed: its proxies break this port's guest threads)
 void vk_dlss_iat_patch(void *inst, void *dev) { (void)inst, (void)dev; }
+
+// The overlay's reason line (menu.cpp perf_picture): "" while DLSS draws, else why it does not.
+extern "C" const char *vk_dlss_blocked(void) { return sl_state().blocked; }
 
 // ---- the rest is the present chain: our decode/encode passes, the images, the per-slot source views.
 static struct {
@@ -327,6 +342,8 @@ static struct {
     sl::DLSSMode mode;
     uint32_t mow, moh;
     int reset;
+    // the last frame DLSS drew, for the overlay (vk_dlss_sizes): the image it read and the picture it wrote
+    uint32_t last_iw, last_ih, last_ow, last_oh;
 } D;
 
 static void barrier(VkCommandBuffer cb, VkImage img, VkImageLayout from, VkImageLayout to, VkPipelineStageFlags2 ss,
@@ -459,6 +476,7 @@ static sl::DLSSMode mode_of(const char *m) {
 
 static bool fail(const char *what, int code = -1) {
     rt_log("vk: DLSS %s failed (%d): off this session, FSR keeps the present", what, code);
+    sl_state().blocked = what;
     return false;
 }
 
@@ -486,12 +504,14 @@ int vk_dlss_record(VkCommandBuffer cb, unsigned slot, VkImage src, VkFormat fmt,
         const sl::Result sup = s.supported(sl::kFeatureDLSS, ai);
         if (sup != sl::Result::eOk) {
             rt_log("vk: DLSS is not supported on this GPU / driver (slIsFeatureSupported %d)", (int)sup);
+            s.blocked = "GPU not supported";
             return 0;
         }
         void *so = nullptr, *os = nullptr;
         if (s.feature_fn(sl::kFeatureDLSS, "slDLSSSetOptions", so) != sl::Result::eOk || !so ||
             s.feature_fn(sl::kFeatureDLSS, "slDLSSGetOptimalSettings", os) != sl::Result::eOk || !os) {
             rt_log("vk: the DLSS plugin functions are missing");
+            s.blocked = "DLSS plugin functions missing";
             return 0;
         }
         s.set_options = reinterpret_cast<PFun_slDLSSSetOptions *>(so);
@@ -641,13 +661,24 @@ int vk_dlss_record(VkCommandBuffer cb, unsigned slot, VkImage src, VkFormat fmt,
     barrier(cb, D.swp, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, CS, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
             XF, VK_ACCESS_2_TRANSFER_READ_BIT);
     barrier(cb, src, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, CS, 0, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, 0);
+    // The blit fills the target rectangle (out[2] x out[3]) whatever the DLSS output size: DLAA keeps the
+    // picture's own size, which is larger than the rectangle whenever the window is smaller than the game
+    // resolution — a 1:1 blit there wrote past the swapchain image and lost the device.
     VkImageBlit region = {.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
                           .srcOffsets = {{0, 0, 0}, {(int)ow, (int)oh, 1}},
                           .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-                          .dstOffsets = {{out[0], out[1], 0}, {out[0] + (int)ow, out[1] + (int)oh, 1}}};
+                          .dstOffsets = {{out[0], out[1], 0}, {out[0] + out[2], out[1] + out[3], 1}}};
     vkCmdBlitImage(cb, D.swp, VK_IMAGE_LAYOUT_GENERAL, dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region,
-                   VK_FILTER_NEAREST);
+                   VK_FILTER_LINEAR);
+    D.last_iw = iw, D.last_ih = ih, D.last_ow = ow, D.last_oh = oh;
     return 1;
+}
+
+// The sizes of the last DLSS frame, for the overlay (menu.cpp perf_picture): the game image it read
+// and the picture it wrote. D lives above, so this is defined after it.
+extern "C" int vk_dlss_sizes(unsigned *in_w, unsigned *in_h, unsigned *out_w, unsigned *out_h) {
+    *in_w = D.last_iw, *in_h = D.last_ih, *out_w = D.last_ow, *out_h = D.last_oh;
+    return D.last_iw && D.last_ow ? 1 : 0;
 }
 
 // The present bookkeeping: SL's common plugin counts evaluates between presents and needs its

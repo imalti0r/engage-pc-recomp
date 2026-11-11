@@ -115,8 +115,13 @@ def main():
         if target:
             subprocess.Popen([str(target), *sys.argv[1:]], cwd=target.parent)
             return
+    # before Tk exists: keeps the windows sharp on a scaled display
+    from .dpi import enable as dpi_enable
+    dpi_enable()
     fix_tcl_paths()
     root = tk.Tk()
+    from .dpi import apply as dpi_apply
+    dpi_apply(root)
     if args.setup:
         app = App(root, 'en', paths)
         if args.dest:

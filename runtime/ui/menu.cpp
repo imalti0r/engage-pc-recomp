@@ -49,6 +49,8 @@ void rt_log(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 void vk_queue_lock(void);
 void vk_queue_unlock(void);
 void res_sizes(unsigned out[2], unsigned scene[2]);
+const char *vk_dlss_blocked(void);
+int vk_dlss_sizes(unsigned *in_w, unsigned *in_h, unsigned *out_w, unsigned *out_h);
 double frame_step_limit_hz(void);
 #ifndef RT_GAME_LIBRARY
 extern const int rt_game_id;
@@ -1161,41 +1163,67 @@ static float perf_gb(float mb) { return mb < 0 ? -1 : mb / 1024; }
 
 // The picture lines: the window, the game image the present shows and the 3D scene it holds (resolution.c), how the
 // present scales the image to the window (gfx_present.c, the last present), the frame limit and the presentation mode
-// in use.
+// in use. With DLSS the sizes it worked in get a line of their own: the resolution it rendered at and the one it
+// produced, which is what the window then gets.
 static void perf_picture(const MenuTarget *t, const ImVec4 &c) {
     unsigned out[2], scene[2];
     res_sizes(out, scene);
-    char v[6][64];
-    snprintf(v[0], sizeof v[0], menu_text(UI_MENU_OV_FMT_SIZE), t->width, t->height);
-    snprintf(v[1], sizeof v[1], menu_text(UI_MENU_OV_FMT_SIZE), (unsigned)t->image_w, (unsigned)t->image_h);
-    snprintf(v[2], sizeof v[2], menu_text(UI_MENU_OV_FMT_SCENE), scene[0], scene[1], scene[0] * 100.0 / out[0]);
+    unsigned dl_in[2] = {0, 0}, dl_out[2] = {0, 0};
+    int dlss = t->scaler == 3 && vk_dlss_sizes(&dl_in[0], &dl_in[1], &dl_out[0], &dl_out[1]);
+    char v[7][80];
+    UiTextId labels[7];
+    int n = 0;
+    snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_SIZE), t->width, t->height);
+    labels[n++] = UI_MENU_OV_WINDOW;
+    if (rt_game_id == 1) {   // the picture the present is given (the crop of the game image): what DLSS reads
+        snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_SIZE), (unsigned)t->image_w, (unsigned)t->image_h);
+        labels[n++] = UI_MENU_OV_OUTPUT;
+    } else {
+        snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_SIZE), (unsigned)t->image_w, (unsigned)t->image_h);
+        labels[n++] = UI_MENU_OV_OUTPUT;
+        snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_SCENE), scene[0], scene[1], scene[0] * 100.0 / out[0]);
+        labels[n++] = UI_MENU_OV_SCENE;
+    }
+    if (dlss) {
+        // the resolution DLSS rendered at and the one it produced; equal sizes (DLAA) print one
+        if (dl_in[0] == dl_out[0] && dl_in[1] == dl_out[1])
+            snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_SIZE), dl_in[0], dl_in[1]);
+        else
+            snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_DLSS_SIZE), dl_in[0], dl_in[1], dl_out[0], dl_out[1]);
+        labels[n++] = UI_MENU_OV_DLSS_SIZE;
+    }
     if (t->scaler == 3) {   // NVIDIA DLSS: name the mode in use
         const char *dm = cfg_value("TOTK_DLSS_MODE");
         UiTextId mid = !strcmp(dm, "quality")   ? UI_MENU_DLSS_QUALITY
                      : !strcmp(dm, "performance") ? UI_MENU_DLSS_PERFORMANCE
                      : !strcmp(dm, "ultra")     ? UI_MENU_DLSS_ULTRA
                                                 : UI_MENU_DLSS_DLAA;
-        snprintf(v[3], sizeof v[3], menu_text(UI_MENU_OV_FMT_DLSS), menu_text(mid));
+        snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_DLSS), menu_text(mid));
     } else if (t->scaler == 2) {
         int s = cfg_int("TOTK_SHARPNESS");
-        snprintf(v[3], sizeof v[3], menu_text(UI_MENU_OV_FMT_FSR), s < 0 ? 0 : s > 100 ? 100 : s);
+        snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_FSR), s < 0 ? 0 : s > 100 ? 100 : s);
     } else {
-        snprintf(v[3], sizeof v[3], "%s", menu_text(t->scaler ? UI_MENU_OV_SCALE_BILINEAR : UI_MENU_OV_SCALE_NONE));
+        // Selected but not drawing: say why instead of leaving "bilinear" without an explanation
+        const char *blocked = vk_dlss_blocked();
+        if (!strcmp(cfg_value("TOTK_UPSCALER"), "dlss") && blocked && *blocked)
+            snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_DLSS_OFF), blocked);
+        else
+            snprintf(v[n], sizeof v[n], "%s", menu_text(t->scaler ? UI_MENU_OV_SCALE_BILINEAR : UI_MENU_OV_SCALE_NONE));
     }
+    labels[n++] = UI_MENU_OV_SCALING;
     double hz = frame_step_limit_hz();
-    snprintf(v[4], sizeof v[4], "%s", menu_text(UI_MENU_OV_NONE));
-    if (hz > 0) snprintf(v[4], sizeof v[4], menu_text(UI_MENU_OV_FPS), hz);
+    snprintf(v[n], sizeof v[n], "%s", menu_text(UI_MENU_OV_NONE));
+    if (hz > 0) snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FPS), hz);
+    labels[n++] = UI_MENU_OV_LIMIT;
     const char *pm = present_name(gfx_window_present_mode());
-    snprintf(v[5], sizeof v[5], "%s", pm ? pm : menu_text(UI_MENU_OV_NONE));
-    static const UiTextId labels[6] = {UI_MENU_OV_WINDOW, UI_MENU_OV_OUTPUT, UI_MENU_OV_SCENE,
-                                       UI_MENU_OV_SCALING, UI_MENU_OV_LIMIT, UI_MENU_OV_PRESENT};
+    snprintf(v[n], sizeof v[n], "%s", pm ? pm : menu_text(UI_MENU_OV_NONE));
+    labels[n++] = UI_MENU_OV_PRESENT;
     if (!ImGui::BeginTable("##perfp", 2, ImGuiTableFlags_SizingFixedFit)) return;
     float vw = 0;
-    for (auto &s : v) vw = fmaxf(vw, ImGui::CalcTextSize(s).x);
+    for (int i = 0; i < n; i++) vw = fmaxf(vw, ImGui::CalcTextSize(v[i]).x);
     ImGui::TableSetupColumn("##p0", ImGuiTableColumnFlags_WidthStretch);
     ImGui::TableSetupColumn("##p1", ImGuiTableColumnFlags_WidthFixed, vw);
-    for (int i = 0; i < 6; i++) {
-        if (rt_game_id == 1 && i == 2) continue;   // res_sizes reports TotK's scene dimensions, not Unity's.
+    for (int i = 0; i < n; i++) {
         perf_label(labels[i], c);
         ImGui::TableNextColumn();
         perf_right(v[i], false);

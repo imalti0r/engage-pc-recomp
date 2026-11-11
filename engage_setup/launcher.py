@@ -14,8 +14,9 @@ TITLE = '0100A6301214E000'
 WRAPPERS = ('', TITLE + '/', 'contents/' + TITLE + '/', 'atmosphere/contents/' + TITLE + '/')
 SETTINGS = {
     'fullscreen': ('display', 'Window mode', '0', {'0': 'Windowed', '1': 'Fullscreen'}),
-    'window_size': ('display', 'Window size', '1920x1080', {v: v for v in ('1280x720', '1600x900', '1920x1080', '2560x1440', '3840x2160')}),
-    'output_res': ('display', 'Game resolution', '1920x1080', {v: v for v in ('1280x720', '1600x900', '1920x1080', '2560x1440')}),
+    'window_size': ('display', 'Window size', '1920x1080', {v: v for v in ('1280x720', '1600x900', '1920x1080', '2560x1440', '3200x1800', '3840x2160')}),
+    'output_res': ('display', 'Game resolution', '1920x1080',
+                   {v: v for v in ('1280x720', '1600x900', '1920x1080', '2560x1440', '3200x1800', '3840x2160')}),
     'render_scale': ('display', '3D render scale', 'game', {'game': 'Game default', **{str(v): str(v) + '%' for v in (50, 75, 100, 150)}}),
     'fps_limit': ('frame rate', 'Frame rate limit', '60', {'30': '30 FPS', '60': '60 FPS'}),
     'vk_present': ('display', 'Presentation', 'fifo', {'fifo': 'VSync', 'mailbox': 'Mailbox', 'immediate': 'Immediate'}),

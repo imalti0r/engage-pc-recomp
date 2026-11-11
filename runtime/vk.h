@@ -113,6 +113,12 @@ void vk_dlss_set_device(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, un
 void vk_dlss_iat_patch(void *inst, void *dev);
 int vk_dlss_record(VkCommandBuffer cb, unsigned slot, VkImage src, VkFormat fmt, int sw, int sh, const int crop[4],
                    VkImage dst, const int out[4], VkFormat dstfmt);
+// Why DLSS is not drawing right now, for the overlay: "" while it runs, else a short reason ("Streamline
+// files missing", "GPU not supported", ...). The setting selects DLSS but the reason says why it fell back.
+const char *vk_dlss_blocked(void);
+// The sizes DLSS worked in on the last present (its input and its output), for the overlay: 1 when
+// DLSS drew that frame. Both are 0 when it did not.
+int vk_dlss_sizes(unsigned *in_w, unsigned *in_h, unsigned *out_w, unsigned *out_h);
 // Streamline's per-frame present bookkeeping: call before the real vkQueuePresentKHR (returns 1 when
 // its hook ran and the present should proceed) and after it.
 int vk_dlss_present_before(VkQueue queue, const VkPresentInfoKHR *pi);
