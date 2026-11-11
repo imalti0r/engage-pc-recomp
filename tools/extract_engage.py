@@ -60,6 +60,65 @@ def input_path(data, name, optional=False):
     return path
 
 
+def plan_inputs(data, keys, title_keys):
+    """The base, update and DLC packages the extraction reads, from the [input] table. A combined
+    cartridge dump (base + 2.0.0 update + DLC on one XCI, input.xci) replaces the base and the update
+    and carries every DLC the separately named files do not: the extractor reads the base game and
+    the update layers from the same package, and each add-on content by its title ID."""
+    if not isinstance(data.get('dlc', {}), dict):
+        raise ValueError('Invalid input.dlc: use a table of DLC title IDs and file paths')
+    dlcs = {title.lower(): Path(path) for title, path in data.get('dlc', {}).items()}
+    if not set(dlcs).issubset(DLC_SPECS):
+        raise ValueError('The config contains an unsupported DLC title ID')
+    xci = input_path(data, 'xci', optional=True)
+    base = update = None
+    if xci:
+        listing = run_tool(keys, ['--contents', xci], 'identity-xci', title_keys)
+        found = {}
+        for kind, title, version in re.findall(r'^content (\w+) ([0-9a-fA-F]{16}) (\d+)\s*$', listing, re.M):
+            found[title.lower()] = (kind, int(version))
+        if found.get(TITLE, (None,))[0] != 'Application':
+            names = ', '.join({'Application': 'the base game', 'Patch': 'an update',
+                               'AddOnContent': 'a DLC', 'Meta': 'a title'}.get(kind, kind) + f' {t}, version {v}'
+                              for t, (kind, v) in sorted(found.items())) or 'no recognized game content'
+            raise ValueError(f'The combined XCI contains {names}. It must hold the base game ({TITLE}) and '
+                             f'the 2.0.0 update ({UPDATE}); a cartridge with only the base game needs the '
+                             'update NSP in the update field.')
+        if found.get(UPDATE, (None, -1))[0] != 'Patch' or found[UPDATE][1] != 327680:
+            versions = ', '.join(f'{t} version {v}' for t, (k, v) in sorted(found.items()) if k == 'Patch') or 'no update'
+            raise ValueError(f'The combined XCI holds {versions}; it must hold the 2.0.0 update ({UPDATE}, version 327680). '
+                             'A cartridge with an older update needs the 2.0.0 update NSP in the update field.')
+        base = update = xci
+        from_xci = [t for t in sorted(DLC_SPECS) if t in found and found[t][0] == 'AddOnContent' and t not in dlcs]
+        if from_xci:
+            print('The combined XCI also carries DLC ' + ', '.join(t.upper() for t in from_xci), flush=True)
+        dlcs.update({t: xci for t in from_xci})
+    else:
+        base, update = (input_path(data, name) for name in ('base', 'update'))
+    for path in (TOOL, keys, base, update, *dlcs.values()):
+        if not path.is_file():
+            raise ValueError(f'Missing input or extractor: {path}')
+    if title_keys is not None and not title_keys.is_file():
+        raise ValueError('Configured title_keys file is missing')
+    if xci:
+        # the combined listing above already named the base game and the update it holds
+        print('Verified the combined XCI: base game and 2.0.0 update', flush=True)
+    else:
+        for label, path, kind, title, version in (
+            ('base', base, 'Application', TITLE, 0),
+            ('update', update, 'Patch', UPDATE, 327680),
+        ):
+            check_content(run_tool(keys, ['--contents', path], f'identity-{label}', title_keys), kind, title, version)
+            print(f'Verified {label} package identity', flush=True)
+    for title, path in dlcs.items():
+        if path == xci:
+            continue
+        check_content(run_tool(keys, ['--contents', path], f'identity-dlc-{title}', title_keys),
+                      'AddOnContent', title, 0)
+        print(f'Verified DLC {title.upper()} package identity', flush=True)
+    return base, update, dlcs
+
+
 def main():
     global TOOL, OUT, LOGS
     parser = argparse.ArgumentParser(description=__doc__)
@@ -75,53 +134,7 @@ def main():
             raise ValueError('Invalid input table: add [input] with keys, base and update file paths')
         keys = input_path(data, 'keys')
         title_keys = input_path(data, 'title_keys', optional=True)
-        if not isinstance(data.get('dlc', {}), dict):
-            raise ValueError('Invalid input.dlc: use a table of DLC title IDs and file paths')
-        dlcs = {title.lower(): Path(path) for title, path in data.get('dlc', {}).items()}
-        if not set(dlcs).issubset(DLC_SPECS):
-            raise ValueError('The config contains an unsupported DLC title ID')
-        # A combined cartridge dump (base + 2.0.0 update + DLC on one XCI) replaces the base, update
-        # and any DLC not given as its own file: the extractor reads the base game and the update
-        # layers from the same package, and each add-on content by its title ID.
-        xci = input_path(data, 'xci', optional=True)
-        base = update = None
-        if xci:
-            listing = run_tool(keys, ['--contents', xci], 'identity-xci', title_keys)
-            found = {}
-            for kind, title, version in re.findall(r'^content (\w+) ([0-9a-fA-F]{16}) (\d+)\s*$', listing, re.M):
-                found[title.lower()] = (kind, int(version))
-            if found.get(TITLE, (None,))[0] != 'Application':
-                names = ', '.join({'Application': 'the base game', 'Patch': 'an update',
-                                   'AddOnContent': 'a DLC', 'Meta': 'a title'}.get(kind, kind) + f' {t}, version {v}'
-                                  for t, (kind, v) in sorted(found.items())) or 'no recognized game content'
-                raise ValueError(f'The combined XCI contains {names}. It must hold the base game ({TITLE}) and '
-                                 f'the 2.0.0 update ({UPDATE}); a cartridge with only the base game needs the '
-                                 'update NSP in the update field.')
-            if found.get(UPDATE, (None, -1))[0] != 'Patch' or found[UPDATE][1] != 327680:
-                versions = ', '.join(f'{t} version {v}' for t, (k, v) in sorted(found.items()) if k == 'Patch') or 'no update'
-                raise ValueError(f'The combined XCI holds {versions}; it must hold the 2.0.0 update ({UPDATE}, version 327680). '
-                                 'A cartridge with an older update needs the 2.0.0 update NSP in the update field.')
-            base = update = xci
-            from_xci = [t for t in sorted(DLC_SPECS) if t in found and found[t][0] == 'AddOnContent' and t not in dlcs]
-            if from_xci:
-                print('The combined XCI also carries DLC ' + ', '.join(t.upper() for t in from_xci), flush=True)
-            dlcs.update({t: xci for t in from_xci})
-        else:
-            base, update = (input_path(data, name) for name in ('base', 'update'))
-        for path in (TOOL, keys, base, update, *dlcs.values()):
-            if not path.is_file():
-                raise ValueError(f'Missing input or extractor: {path}')
-        if title_keys is not None and not title_keys.is_file():
-            raise ValueError('Configured title_keys file is missing')
-        for label, path, kind, title, version in (
-            ('base', base, 'Application', TITLE, 0),
-            ('update', update, 'Patch', UPDATE, 327680),
-            *((f'dlc-{title}', path, 'AddOnContent', title, 0) for title, path in dlcs.items() if path != xci),
-        ):
-            check_content(run_tool(keys, ['--contents', path], f'identity-{label}', title_keys), kind, title, version)
-            print(f'Verified {label} package identity', flush=True)
-        if xci:
-            print('Verified the combined XCI: base game and 2.0.0 update', flush=True)
+        base, update, dlcs = plan_inputs(data, keys, title_keys)
         if (OUT / 'ExeFS').exists() or (OUT / 'RomFS').exists():
             raise ValueError('ExeFS/RomFS already exist: inspect the previous extraction before retrying')
         OUT.mkdir(parents=True, exist_ok=True)

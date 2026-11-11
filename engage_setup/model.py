@@ -8,14 +8,22 @@ from installer.guilogic import Catalog as BaseCatalog, Form as BaseForm, STEP_OR
 from installer import ini
 
 TITLE = '0100A6301214E000'
-FIELDS = ('base', 'update', 'keys', 'firmware', 'dlc1', 'dlc2', 'title_keys')
+FIELDS = ('base', 'update', 'keys', 'firmware', 'dlc1', 'dlc2', 'title_keys', 'xci')
 TEXT = {
     'ui.title': 'Engage Setup',
-    'ui.intro': 'Choose your game files and an install folder. Setup builds Engage on this PC.\nThe first installation can take 20–60 minutes; you can follow each step below.',
+    'ui.intro': 'Choose your game files and an install folder. Setup builds Engage on this PC.\n'
+                'A combined cartridge dump (an XCI holding the base game, the 2.0.0 update and the DLC) can go in the '
+                'first field, leaving Base, Update and the DLC fields empty. Files can also be given separately.\n'
+                'The first installation can take 20–60 minutes; you can follow each step below.',
     'ui.notice': 'Experimental alpha. Opening scenes, audio and the first battle have been tested.\nFull-game completion and long-session stability remain unverified.',
     'ui.base': 'Base game (NSP / XCI)', 'ui.update': 'Update 2.0.0 (NSP)',
     'ui.firmware': 'Firmware NCA folder', 'ui.dlc1': 'Expansion Pass (optional)',
     'ui.dlc2': 'Order of Heroes (optional)', 'ui.title_keys': 'title.keys (optional)',
+    'ui.xci': 'Combined XCI (base + update 2.0.0 + DLC)',
+    'ui.pick_xci': 'Choose the combined cartridge dump (XCI)',
+    'ui.xci_note': 'The combined XCI covers the base game, the 2.0.0 update and any DLC it holds; the fields below '
+                   'stay empty unless you want to supply a file the XCI lacks.',
+    'ui.need_xci': 'Choose the combined XCI or the base game and update.',
     'ui.keys_private': 'Keys are read from the selected files, never copied into the install folder.\nKeep your game dumps and keys private. Allow at least 40 GiB free on the install drive.',
     'ui.need_update': 'Choose the Engage 2.0.0 update.',
     'ui.need_firmware': 'Choose an extracted firmware NCA folder.',
@@ -36,7 +44,7 @@ TEXT = {
     'phase.compile.work': 'Compiling the native executable…',
     'phase.prepare.work': 'Checking the build and installing local files…',
 }
-for name in ('dlc1', 'dlc2', 'title_keys'):
+for name in ('dlc1', 'dlc2', 'title_keys', 'xci'):
     TEXT['ui.missing_' + name] = f'The selected {name.replace("_", ".")} file does not exist.'
 
 
@@ -60,6 +68,7 @@ class Form(BaseForm):
     dlc1: str = ''
     dlc2: str = ''
     title_keys: str = ''
+    xci: str = ''
 
     def installed_state(self):
         return installed_state(self.dest) if self.dest.strip() else None
@@ -75,11 +84,17 @@ class Form(BaseForm):
         found = []
         if not self.dest.strip():
             found.append('ui.need_dest')
+        combined = self.xci.strip()
+        # The combined XCI covers the base game, the update and any DLC it holds: base, update and the
+        # two DLC fields may stay empty. Each individually given file still must exist.
+        need = ('xci', 'keys', 'firmware') if combined else ('base', 'update', 'keys', 'firmware')
+        if not finished:
+            for name in need:
+                if not getattr(self, name).strip():
+                    found.append('ui.need_' + name)
         for name in FIELDS:
             value = getattr(self, name).strip()
-            if not value and name in FIELDS[:4] and not finished:
-                found.append('ui.need_' + name)
-            elif value and not (Path(value).is_dir() if name == 'firmware' else Path(value).is_file()):
+            if value and not (Path(value).is_dir() if name == 'firmware' else Path(value).is_file()):
                 found.append('ui.missing_' + name)
         if self.lang not in ini.LANGUAGES:
             found.append('ui.need_lang')

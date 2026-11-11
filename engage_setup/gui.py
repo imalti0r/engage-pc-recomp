@@ -20,17 +20,23 @@ class App(BaseApp):
             self.vars[name] = tk.StringVar()
         frame = super().build_form()
         grid = self.form_rows['base'].master
+        # The combined XCI row goes first: with it set, the base, update and DLC rows below may stay
+        # empty. Rows 0-2 hold base/update/keys, 3 the game language and 4 the install folder; they
+        # shift to make room, and the firmware folder lands after keys.
         for widget in grid.grid_slaves():
             row = int(widget.grid_info()['row'])
-            if row >= 3:
-                widget.grid_configure(row=row + 1)
-        self.label(grid, 'ui.firmware').grid(row=3, column=0, sticky='w', padx=(0, 10), pady=4)
-        ttk.Entry(grid, textvariable=self.vars['firmware']).grid(row=3, column=1, sticky='ew', pady=4)
-        self.button(grid, 'ui.browse', lambda: self.pick_file('firmware', 'ui.firmware')).grid(row=3, column=2, padx=(8, 0))
+            widget.grid_configure(row=row + (2 if row >= 3 else 1))
+        self.label(grid, 'ui.xci').grid(row=0, column=0, sticky='w', padx=(0, 10), pady=4)
+        ttk.Entry(grid, textvariable=self.vars['xci']).grid(row=0, column=1, sticky='ew', pady=4)
+        self.button(grid, 'ui.browse', lambda: self.pick_file('xci', 'ui.pick_xci')).grid(row=0, column=2, padx=(8, 0))
+        self.vars['xci'].trace_add('write', lambda *_: self.refresh_form())
+        self.label(grid, 'ui.firmware').grid(row=4, column=0, sticky='w', padx=(0, 10), pady=4)
+        ttk.Entry(grid, textvariable=self.vars['firmware']).grid(row=4, column=1, sticky='ew', pady=4)
+        self.button(grid, 'ui.browse', lambda: self.pick_file('firmware', 'ui.firmware')).grid(row=4, column=2, padx=(8, 0))
         extra = ttk.LabelFrame(frame, text='Optional extras', padding=8)
         extra.pack(fill='x', before=self.update_hint, pady=(10, 0))
         extra.columnconfigure(1, weight=1)
-        for row, name in enumerate(FIELDS[4:]):
+        for row, name in enumerate(name for name in FIELDS[4:] if name != 'xci'):
             self.label(extra, 'ui.' + name).grid(row=row, column=0, sticky='w', padx=(0, 10), pady=4)
             ttk.Entry(extra, textvariable=self.vars[name]).grid(row=row, column=1, sticky='ew', pady=4)
             self.button(extra, 'ui.browse', lambda n=name: self.pick_file(n, 'ui.' + n)).grid(
@@ -42,9 +48,12 @@ class App(BaseApp):
 
     def refresh_form(self):
         super().refresh_form()
-        update = self.form().finished()
+        form = self.form()
+        update = form.finished()
         if update:
             self.update_hint.configure(text=self.cat('ui.update_ready'))
+        elif form.xci.strip():
+            self.update_hint.configure(text=self.cat('ui.xci_note'))
         self.start_button.configure(text=self.cat('ui.update_start' if update else 'ui.start'))
 
     def pick_file(self, name, pick_id):

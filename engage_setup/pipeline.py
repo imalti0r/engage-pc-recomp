@@ -179,6 +179,8 @@ class Pipeline:
     def extract(self):
         config = self.work / 'inputs.toml'
         lines = ['[input]']
+        if self.form.xci.strip():
+            lines.append(f'xci = {json.dumps(self.form.xci)}')
         for name in ('base', 'update', 'keys', 'title_keys', 'firmware'):
             value = getattr(self.form, name)
             if value:

@@ -62,6 +62,65 @@ class ExtractEngageTest(unittest.TestCase):
             extract_engage.check_content('content AddOnContent 0100a6301214f001 0\n',
                                          'Application', extract_engage.TITLE, 0)
 
+    def test_combined_xci_identity_and_errors(self):
+        listing = ('content Application 0100a6301214e000 0\n'
+                   'content Patch 0100a6301214e800 327680\n'
+                   'content AddOnContent 0100a6301214f001 0\n'
+                   'content AddOnContent 0100a6301214f002 0\n')
+        with tempfile.TemporaryDirectory() as temporary:
+            keys = Path(temporary) / 'prod.keys'
+            keys.write_text('# synthetic test file\n')
+            xci = Path(temporary) / 'combined.xci'
+            xci.write_text('# synthetic test file\n')
+            result = subprocess.CompletedProcess([], 0, listing, '')
+            tool = Path(temporary) / 'nx_extract.exe'
+            tool.write_text('# synthetic test file\n')
+            with tempfile.TemporaryDirectory() as out, patch.object(extract_engage, 'LOGS', Path(out)), \
+                    patch.object(extract_engage, 'TOOL', tool), \
+                    patch.object(extract_engage.subprocess, 'run', return_value=result) as run, \
+                    patch('builtins.print'):
+                base, update, dlcs = extract_engage.plan_inputs({'keys': str(keys), 'xci': str(xci)}, keys, None)
+            # the combined XCI needs one contents listing; no per-file identity runs for the
+            # base game, the update or the DLCs it carries (the add-on content calls belong
+            # to the extraction, not the planning)
+            self.assertEqual([c.args[0] for c in run.call_args_list], [[str(tool), str(keys), '--contents', str(xci)]])
+            # a separately named DLC file wins over the XCI's copy
+            dlc1 = Path(temporary) / 'dlc1.nsp'
+            dlc1.write_text('# synthetic test file\n')
+            dlc_listing = 'content AddOnContent 0100a6301214f001 0\n'
+            # run_tool's child command is [<tool>, <keys>, --contents, <package>]: the listing
+            # depends on the package, the XCI gets the combined one, the DLC file its own
+            by_package = lambda arguments, **_: subprocess.CompletedProcess(
+                [], 0, listing if arguments[3].endswith('.xci') else dlc_listing, '')
+            with tempfile.TemporaryDirectory() as out, patch.object(extract_engage, 'LOGS', Path(out)), \
+                    patch.object(extract_engage, 'TOOL', tool), \
+                    patch.object(extract_engage.subprocess, 'run', side_effect=by_package) as run, \
+                    patch('builtins.print'):
+                _, _, dlcs = extract_engage.plan_inputs(
+                    {'keys': str(keys), 'xci': str(xci),
+                     'dlc': {'0100a6301214f001': str(dlc1)}}, keys, None)
+            self.assertEqual(dlcs['0100a6301214f001'], dlc1)
+            self.assertEqual(dlcs['0100a6301214f002'], xci)
+            calls = [c.args[0] for c in run.call_args_list]
+            self.assertIn([str(tool), str(keys), '--contents', str(dlc1)], calls)
+        for broken, why in (
+            (listing.replace('Patch 0100a6301214e800 327680', 'Patch 0100a6301214e800 0'), '2.0.0'),
+            (listing.replace('Patch 0100a6301214e800 327680\n', ''), '2.0.0'),
+            (listing.replace('Application 0100a6301214e000 0', 'Application 0100a6301214e001 0'), '0100a6301214e000'),
+        ):
+            with tempfile.TemporaryDirectory() as temporary:
+                keys = Path(temporary) / 'prod.keys'
+                keys.write_text('# synthetic test file\n')
+                xci = Path(temporary) / 'combined.xci'
+                xci.write_text('# synthetic test file\n')
+                result = subprocess.CompletedProcess([], 0, broken, '')
+                with tempfile.TemporaryDirectory() as out, patch.object(extract_engage, 'LOGS', Path(out)), \
+                        patch.object(extract_engage, 'TOOL', keys), \
+                        patch.object(extract_engage.subprocess, 'run', return_value=result), \
+                        patch('builtins.print'), self.assertRaises(ValueError) as raised:
+                    extract_engage.plan_inputs({'keys': str(keys), 'xci': str(xci)}, keys, None)
+                self.assertIn(why, str(raised.exception))
+
     def test_tool_logs_redact_key_sized_values_and_fail_closed(self):
         secret = 'ab' * 16
         with tempfile.TemporaryDirectory() as temporary:
