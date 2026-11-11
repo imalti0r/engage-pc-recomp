@@ -46,6 +46,19 @@ class SetupTest(unittest.TestCase):
             form.firmware = ''
             self.assertIn('ui.need_firmware', form.problems())
 
+    def test_form_takes_a_combined_xci_instead_of_base_and_update(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            keys = root / 'prod.keys'
+            keys.touch()
+            xci = root / 'combined.xci'
+            xci.touch()
+            form = Form(xci=str(xci), keys=str(keys), firmware=str(root), dest=str(root / 'install'), lang='en-US')
+            self.assertEqual(form.problems(), [])
+            self.assertIn('--xci', form.command('python.exe'))
+            form.xci = ''
+            self.assertEqual(form.problems(), ['ui.need_base', 'ui.need_update'])
+
     def test_finished_install_needs_no_input_files(self):
         with tempfile.TemporaryDirectory() as temp:
             form = Form(dest=temp, lang='en-US')
