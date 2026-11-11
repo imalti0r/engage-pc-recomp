@@ -608,7 +608,7 @@ static void present_image(VkImage src, VkImageLayout layout, VkFormat fmt, int w
     // than the crop, or for DLAA at the picture's own size; else the bilinear blit
     int scaled = general && vk_dlss_record(cb, slot, psrc, pfmt, graded ? cw : w, graded ? ch : h, prect, dst, to, g_sc_fmt);
     int fsr = !scaled && general && vk_fsr_record(cb, slot, psrc, pfmt, graded ? cw : w, graded ? ch : h, prect, dst, to);
-    g_scaler = scaled ? 3 : fsr ? 2 : cw != to[2] || ch != to[3];
+    g_scaler = scaled ? 3 : fsr ? 2 : cw != to[2] || ch != to[3];   // 3 NVIDIA DLSS, 2 FSR, 1 the blit scaled, 0 not
     if (!fsr) {
         if (general)   // a GENERAL source (vk_texture.c images): earlier submissions' writes become visible to the blit here
             sync_barrier(cb, psrc, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,

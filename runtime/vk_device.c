@@ -247,9 +247,10 @@ static int create_device(void) {
         CHAIN(lr, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_LOCAL_READ_FEATURES_KHR);
     }
     if (has_ext(ep, ne, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME)) { g_vk.has_memory_budget = 1; ext[n_ext++] = VK_EXT_MEMORY_BUDGET_EXTENSION_NAME; }
-    // Streamline's DLSS (vk_dlss.cpp): NGX's Vulkan cubins need NVIDIA's binary import
-    if (!strcmp(cfg_value("TOTK_UPSCALER"), "dlss") && has_ext(ep, ne, VK_NVX_BINARY_IMPORT_EXTENSION_NAME) &&
-        has_ext(ep, ne, VK_NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME)) {
+    // Streamline's DLSS (vk_dlss.cpp): NGX's Vulkan cubins need NVIDIA's binary import; enabled
+    // whenever the driver has them so DLSS can be selected mid-session (vk_dlss_record starts
+    // Streamline lazily then)
+    if (has_ext(ep, ne, VK_NVX_BINARY_IMPORT_EXTENSION_NAME) && has_ext(ep, ne, VK_NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME)) {
         ext[n_ext++] = VK_NVX_BINARY_IMPORT_EXTENSION_NAME;
         ext[n_ext++] = VK_NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME;
         rt_log("vk: NVX binary import + image view handle on for Streamline's DLSS");

@@ -74,6 +74,7 @@ struct Sl {
     int (*hook_present)(VkQueue, const VkPresentInfoKHR *, bool &) = nullptr;
     int (*hook_after_present)() = nullptr;
     int hooks_tried = 0;
+    int sl_failed = 0;   // a start attempt already failed this session (the log says why)
 };
 
 Sl &sl_state() {
@@ -191,12 +192,10 @@ static void sl_range(void) {
     (void)n;
 }
 
-// Called by vk_device.c right after the device exists: loads Streamline (slInit), then hands the
-// real handles over with slSetVulkanInfo — no loader routing, the interposer's proxies break this
-// port's guest threads. Everything happens here so the NGX context sees the device when the DLSS
-// plugin starts.
-void vk_dlss_set_device(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, unsigned gfx_family, unsigned gfx_index) {
-    if (strcmp(cfg_value("TOTK_UPSCALER"), "dlss")) return;
+// Starts Streamline (slInit) and hands the real handles over with slSetVulkanInfo — no loader
+// routing, the interposer's proxies break this port's guest threads. Everything happens here so the
+// NGX context sees the device when the DLSS plugin starts. 1 = Streamline is up.
+static int sl_start(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, unsigned gfx_family, unsigned gfx_index) {
     Sl &s = sl_state();
     const std::wstring dir = sl_dir();
     const std::wstring dll = dir + L"sl.interposer.dll";
@@ -205,7 +204,7 @@ void vk_dlss_set_device(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, un
                "sl.dlss.dll, nvngx_dlss.dll) in upscalers\\streamline next to the game, or name their folder in "
                "TOTK_DLSS_DIR; FSR keeps the present",
                narrow(dll).c_str());
-        return;
+        return 0;
     }
     std::string missing;
     for (const wchar_t *f : kRequired)
@@ -213,16 +212,16 @@ void vk_dlss_set_device(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, un
     if (!missing.empty()) {
         rt_log("vk: DLSS selected but %s lacks %s: copy all four Streamline files there; FSR keeps the present",
                narrow(dir).c_str(), missing.c_str());
-        return;
+        return 0;
     }
     if (!sl::security::verifyEmbeddedSignature(dll.c_str())) {
         rt_log("vk: %s has no valid NVIDIA signature: not loaded", narrow(dll).c_str());
-        return;
+        return 0;
     }
     s.mod = LoadLibraryW(dll.c_str());
     if (!s.mod) {
         rt_log("vk: LoadLibrary(%s) failed (error %lu)", narrow(dll).c_str(), GetLastError());
-        return;
+        return 0;
     }
     auto get = [&](const char *n) { return reinterpret_cast<void *>(GetProcAddress(s.mod, n)); };
     s.init = reinterpret_cast<PFun_slInit *>(get("slInit"));
@@ -235,7 +234,7 @@ void vk_dlss_set_device(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, un
     s.shutdown = reinterpret_cast<PFun_slShutdown *>(get("slShutdown"));
     if (!s.init || !s.supported || !s.token || !s.constants || !s.tag || !s.evaluate || !s.feature_fn) {
         rt_log("vk: sl.interposer.dll lacks the Streamline API");
-        return;
+        return 0;
     }
     static const wchar_t *paths[1];
     static std::wstring plugin_dir;
@@ -273,12 +272,12 @@ void vk_dlss_set_device(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, un
             rt_log("vk: Streamline init crashed (guarded); DLSS stays off this session, FSR keeps the present");
         else
             rt_log("vk: slInit failed (%d): DLSS off", (int)r);
-        return;
+        return 0;
     }
     auto set_info = reinterpret_cast<PFun_slSetVulkanInfo *>(GetProcAddress(s.mod, "slSetVulkanInfo"));
     if (!set_info) {
         rt_log("vk: DLSS off: sl.interposer.dll has no slSetVulkanInfo");
-        return;
+        return 0;
     }
     sl::VulkanInfo info;
     info.device = dev;
@@ -293,11 +292,19 @@ void vk_dlss_set_device(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, un
     r = set_info(info);
     if (r != sl::Result::eOk) {
         rt_log("vk: slSetVulkanInfo failed (%d): DLSS off", (int)r);
-        return;
+        return 0;
     }
     s.started = true;
     rt_log("vk: Streamline %d.%d.%d started with the device (family %u, index %u), no interposer hooks",
            SL_VERSION_MAJOR, SL_VERSION_MINOR, SL_VERSION_PATCH, gfx_family, gfx_index);
+    return 1;
+}
+
+// Called by vk_device.c right after the device exists: DLSS selected at start-up starts Streamline
+// here; selected later it starts from vk_dlss_record's first call instead.
+void vk_dlss_set_device(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, unsigned gfx_family, unsigned gfx_index) {
+    if (strcmp(cfg_value("TOTK_UPSCALER"), "dlss")) return;
+    sl_start(inst, phys, dev, gfx_family, gfx_index);
 }
 
 // ---- (the interposer-hook mode was removed: its proxies break this port's guest threads)
@@ -462,8 +469,16 @@ int vk_dlss_record(VkCommandBuffer cb, unsigned slot, VkImage src, VkFormat fmt,
     int cw = crop[2], ch = crop[3];
     uint32_t dw = (uint32_t)out[2], dh = (uint32_t)out[3];
     if (rt_game_id != 1 || strcmp(cfg_value("TOTK_UPSCALER"), "dlss") || !fmt) return 0;
-    if (!s.started) return 0;
     VkCtx *c = vk_ctx();
+    if (!s.started) {   // DLSS selected mid-session: start Streamline now (the device carries the NVX
+        // extensions, vk_device.c enables them whenever present)
+        if (s.sl_failed) return 0;
+        if (!sl_start(c->instance, c->phys, c->device, c->gfx_family, 0)) {
+            s.sl_failed = 1;
+            return 0;
+        }
+        D.tried = 0;   // the just-started Streamline needs its first supported/options pass
+    }
     if (!D.tried) {
         D.tried = 1;
         sl::AdapterInfo ai;

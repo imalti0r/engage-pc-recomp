@@ -1162,7 +1162,14 @@ static void perf_picture(const MenuTarget *t, const ImVec4 &c) {
     snprintf(v[0], sizeof v[0], menu_text(UI_MENU_OV_FMT_SIZE), t->width, t->height);
     snprintf(v[1], sizeof v[1], menu_text(UI_MENU_OV_FMT_SIZE), (unsigned)t->image_w, (unsigned)t->image_h);
     snprintf(v[2], sizeof v[2], menu_text(UI_MENU_OV_FMT_SCENE), scene[0], scene[1], scene[0] * 100.0 / out[0]);
-    if (t->scaler == 2) {
+    if (t->scaler == 3) {   // NVIDIA DLSS: name the mode in use
+        const char *dm = cfg_value("TOTK_DLSS_MODE");
+        UiTextId mid = !strcmp(dm, "quality")   ? UI_MENU_DLSS_QUALITY
+                     : !strcmp(dm, "performance") ? UI_MENU_DLSS_PERFORMANCE
+                     : !strcmp(dm, "ultra")     ? UI_MENU_DLSS_ULTRA
+                                                : UI_MENU_DLSS_DLAA;
+        snprintf(v[3], sizeof v[3], menu_text(UI_MENU_OV_FMT_DLSS), menu_text(mid));
+    } else if (t->scaler == 2) {
         int s = cfg_int("TOTK_SHARPNESS");
         snprintf(v[3], sizeof v[3], menu_text(UI_MENU_OV_FMT_FSR), s < 0 ? 0 : s > 100 ? 100 : s);
     } else {
