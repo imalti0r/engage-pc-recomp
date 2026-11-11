@@ -59,6 +59,29 @@ class SetupTest(unittest.TestCase):
             form.xci = ''
             self.assertEqual(form.problems(), ['ui.need_base', 'ui.need_update'])
 
+    def test_extract_writes_the_combined_xci_into_the_config(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            paths = SimpleNamespace(root=root, extractor=root / 'nx_extract.exe')
+            pipeline = Pipeline(Form(xci='C:/dumps/combined.xci', keys='C:/dumps/prod.keys',
+                                     firmware=str(root), dest=str(root / 'install')), paths,
+                                Reporter(out=io.StringIO()))
+            pipeline.work.mkdir(parents=True)
+            seen = []
+
+            def capture(script, *arguments):
+                if '--config' not in arguments:
+                    return
+                config = Path(arguments[arguments.index('--config') + 1])
+                seen.append((Path(script).name, config.read_text(encoding='utf-8')))
+
+            with patch.object(pipeline, 'python', side_effect=capture), patch.object(pipeline, 'reporter'):
+                pipeline.extract()
+            extract = next(text for name, text in seen if name == 'extract_engage.py')
+            self.assertIn('xci = "C:/dumps/combined.xci"', extract)
+            self.assertNotIn('base =', extract)
+            self.assertNotIn('update =', extract)
+
     def test_finished_install_needs_no_input_files(self):
         with tempfile.TemporaryDirectory() as temp:
             form = Form(dest=temp, lang='en-US')
