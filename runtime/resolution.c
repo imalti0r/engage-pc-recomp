@@ -35,6 +35,7 @@
 #include <zstd.h>
 
 #include "cfg.h"
+#include "gfx.h"
 #include "host.h"
 // runtime/ui/menu.cpp: the monitor the window is on, for capping the game resolution (0 when unknown)
 int gfx_window_monitor_size(int *w, int *h);
@@ -224,54 +225,83 @@ void res_heapdef_served(void) { R.heapdef_ok = 1; }
 // ---- start: the patch page and the sets
 static uint64_t pack(unsigned w, unsigned h) { return (uint64_t)h << 32 | w; }
 
+// Which window/upscaler settings the live path has already applied. Each change writes the new sizes into the patch
+// page and calls res_engage_live, which re-asks the game for its buffers (see below).
+static unsigned g_live_seen;
+static char g_live_up[8], g_live_mode[16], g_live_res[24], g_live_scale[8];
+
 // The DLSS mode's upscale ratio (see vk_dlss.cpp mode_of): the game draws at 1/ratio of the target resolution and
 // DLSS brings it up. DLAA (and FSR, which scales on the present) keeps the target size.
 static float dlss_shrink(void) {
     if (strcmp(cfg_value("TOTK_UPSCALER"), "dlss")) return 1.0f;
     const char *m = cfg_value("TOTK_DLSS_MODE");
-    if (!strcmp(m, "quality")) return 1.5f;
-    if (!strcmp(m, "performance")) return 2.0f;
-    if (!strcmp(m, "ultra")) return 3.0f;
+    if (!strcmp(m, "quality")) return 1.5f;                        // 66.7 % of the game resolution
+    if (!strcmp(m, "balanced")) return 1.0f / 0.58f;               // 58 %
+    if (!strcmp(m, "performance")) return 2.0f;                    // 50 %
+    if (!strcmp(m, "ultra")) return 3.0f;                          // 33.3 %
     return 1.0f;   // DLAA, and anything unknown
 }
 
 // The size DLSS upscales to (Engage): the chosen game resolution after the window limit, before the DLSS mode
 // divides it into the size the game actually draws. Zero until res_init ran.
 static unsigned E_target[2];
+// What Engage actually draws in, and its 3D scene (engage_apply): the overlay's lines (res_sizes) report these, not
+// the TotK path's R, which Engage never fills.
+static unsigned E_draw[2], E_scene[2];
 
 void res_engage_target(unsigned out[2]) {
     out[0] = E_target[0];
     out[1] = E_target[1];
 }
 
-static void engage_init(void) {
+// What the game was told to draw and the resolution DLSS upscales that to, both as currently configured. The overlay
+// reports these instead of the last present's sizes: those belong to the previous setting for a frame or two after a
+// change, which showed a stale scene size against the new game resolution.
+void res_engage_sizes(unsigned draw[2], unsigned target[2]) {
+    draw[0] = E_draw[0], draw[1] = E_draw[1];
+    target[0] = E_target[0], target[1] = E_target[1];
+}
+
+// Writes the wanted output size and 3D scale into the patch page and switches the sets. Called at start and again on
+// every settings change (res_engage_live): the game reads these values when it builds its buffers and camera, so the
+// change reaches the game without a restart.
+static void engage_apply(const char *why) {
     unsigned w = BASE_W, h = BASE_H;
-    const char *o = cfg_value("TOTK_OUTPUT_RES"), *s = cfg_value("TOTK_RENDER_SCALE");
+    const char *s = cfg_value("TOTK_RENDER_SCALE");
+    // The window is the resolution: one setting, not a separate game size. The game composes its picture in the
+    // window's size, and DLSS's mode divides that into what it renders. A picture larger than the window would be
+    // scaled back down on its way to the screen, throwing away what DLSS upscaled.
+    unsigned int wn = 0, hn = 0;
     char tail;
-    unsigned ow, oh;
-    if (sscanf(o, "%ux%u%c", &ow, &oh, &tail) == 2 &&
-        ((ow == 1280 && oh == 720) || (ow == 1600 && oh == 900) ||
-         (ow == 1920 && oh == 1080) || (ow == 2560 && oh == 1440) ||
-         (ow == 3200 && oh == 1800) || (ow == 3840 && oh == 2160))) {
-        w = ow, h = oh;
-    } else rt_log("resolution: Engage does not support %s; using 1920x1080", o);
-    // The same limit as decide(): a picture larger than the window is scaled back down on its way to the
-    // screen, which throws away what DLSS's mode upscaled.
-    {
-        int cw, ch;
-        window_cap(&cw, &ch);
-        fit_into(&w, &h, cw, ch);
-    }
+    if (sscanf(cfg_value("TOTK_WINDOW_SIZE"), "%ux%u%c", &wn, &hn, &tail) == 2 && wn >= 1280 && hn >= 720) {
+        // Engage takes 16:9 sizes from its smallest (1280x720) up to 3840x2160: anything else falls back
+        // to the 16:9 size nearest below the window, so the picture never spills past the screen.
+        static const unsigned kOk[][2] = {{1280, 720}, {1600, 900}, {1920, 1080}, {2560, 1440}, {3200, 1800}, {3840, 2160}};
+        unsigned pick_w = 0, pick_h = 0;
+        for (size_t i = 0; i < sizeof kOk / sizeof *kOk; i++)
+            if (kOk[i][0] == wn && kOk[i][1] == hn) pick_w = wn, pick_h = hn;
+        if (!pick_w) {
+            for (size_t i = 0; i < sizeof kOk / sizeof *kOk; i++)
+                if (kOk[i][0] <= wn && kOk[i][1] <= hn) pick_w = kOk[i][0], pick_h = kOk[i][1];
+            if (!pick_w) pick_w = 1280, pick_h = 720;
+        }
+        if (pick_w != wn || pick_h != hn)
+            rt_log("resolution: the %ux%u window is not a 16:9 size Engage draws; the game uses %ux%u", wn, hn, pick_w, pick_h);
+        w = pick_w, h = pick_h;
+    } else rt_log("resolution: TOTK_WINDOW_SIZE=%s is not <width>x<height>; the game draws 1920x1080",
+                  cfg_value("TOTK_WINDOW_SIZE"));
     E_target[0] = w & ~1u, E_target[1] = h & ~1u;
     // DLSS Quality/Performance/Ultra Performance: the game draws smaller and DLSS upscales to the size above,
-    // which is what the window presents (vk_dlss.cpp caps its output at the window and takes the ratio from there)
+    // which is what the window presents (vk_dlss.cpp takes its output from res_engage_target). DLSS accepts inputs
+    // well below 1280x720 (its own optimal size for 1080p Performance is 960x540), so only a floor that keeps the
+    // buffer sane applies.
     const float shrink = dlss_shrink();
     if (shrink > 1.0f) {
         unsigned rw = (unsigned)(w / shrink + 0.5f) & ~1u, rh = (unsigned)(h / shrink + 0.5f) & ~1u;
-        if (rw >= 1280 && rh >= 720) {
+        if (rw >= 640 && rh >= 360) {
             rt_log("resolution: DLSS x%.2f: the game draws %ux%u and DLSS upscales to %ux%u", shrink, rw, rh, w, h);
             w = rw, h = rh;
-        } else rt_log("resolution: DLSS x%.2f on %ux%u would draw below 1280x720; the game keeps %ux%u", shrink, w, h, w, h);
+        } else rt_log("resolution: DLSS x%.2f on %ux%u would draw below 640x360; the game keeps %ux%u", shrink, w, h, w, h);
     }
     float scale = 1;
     int fixed = strcmp(s, "game") != 0;
@@ -295,8 +325,20 @@ static void engage_init(void) {
     memcpy(page + 72, &scale, 4);
     rt_patch_switch(output, w != BASE_W || h != BASE_H);
     rt_patch_switch(scene, fixed);
-    rt_log("resolution: Engage output %ux%u, 3D scale %s%s; restart required", w, h, s,
-           fixed ? "%" : " (game controlled)");
+    // what the overlay reports (res_sizes): the size drawn and the 3D scene inside it
+    E_draw[0] = w, E_draw[1] = h;
+    E_scene[0] = (unsigned)(w * scale + 0.5f), E_scene[1] = (unsigned)(h * scale + 0.5f);
+    rt_log("resolution: Engage output %ux%u, 3D scale %s%s (%s)", w, h, s, fixed ? "%" : " (game controlled)", why);
+}
+
+static void engage_init(void) {
+    engage_apply("start");
+    // the live path remembers what start already applied, so the first settings change is the first change
+    snprintf(g_live_res, sizeof g_live_res, "%s", cfg_value("TOTK_OUTPUT_RES"));
+    snprintf(g_live_up, sizeof g_live_up, "%s", cfg_value("TOTK_UPSCALER"));
+    snprintf(g_live_mode, sizeof g_live_mode, "%s", cfg_value("TOTK_DLSS_MODE"));
+    snprintf(g_live_scale, sizeof g_live_scale, "%s", cfg_value("TOTK_RENDER_SCALE"));
+    g_live_seen = 1;
 }
 
 void res_init(void) {
@@ -384,12 +426,44 @@ void res_fov_live(void) {
     rt_log("resolution: field of view %d%% of the game's", pct);
 }
 
+// The live path for the resolution and upscaler settings (gfx_present.c window_settings_live, every settings change).
+// The patch page's size and scale are rewritten here, so the game sees the new values the next time it builds its
+// buffers or reads its camera scale — no restart.
+void res_engage_live(void) {
+    if (!RT_ENGAGE) return;
+    const char *res = cfg_value("TOTK_OUTPUT_RES"), *up = cfg_value("TOTK_UPSCALER");
+    const char *mode = cfg_value("TOTK_DLSS_MODE"), *scale = cfg_value("TOTK_RENDER_SCALE");
+    if (g_live_seen && !strcmp(res, g_live_res) && !strcmp(up, g_live_up) && !strcmp(mode, g_live_mode) &&
+        !strcmp(scale, g_live_scale))
+        return;
+    snprintf(g_live_res, sizeof g_live_res, "%s", res);
+    snprintf(g_live_up, sizeof g_live_up, "%s", up);
+    snprintf(g_live_mode, sizeof g_live_mode, "%s", mode);
+    snprintf(g_live_scale, sizeof g_live_scale, "%s", scale);
+    int first = !g_live_seen;
+    g_live_seen = 1;
+    engage_apply(first ? "start" : "settings changed");
+    // Unity re-reads the display and rebuilds its buffers when the console changes operation mode (docked to handheld
+    // and back), which is how a resolution change happens on the real hardware. Push that notification after a live
+    // change so the new size in the patch page is picked up without a restart; the mode itself stays as configured.
+    if (!first) {
+        oe_push_message(OE_MSG_OPERATION_MODE_CHANGED);
+        oe_push_message(OE_MSG_PERFORMANCE_MODE_CHANGED);
+        rt_log("resolution: pushed the operation-mode change so the game rebuilds its buffers");
+    }
+}
+
 void res_wanted(unsigned out[2]) {
     decide();
     out[0] = R.ow, out[1] = R.oh;
 }
 
 void res_sizes(unsigned out[2], unsigned scene[2]) {
+    if (RT_ENGAGE) {   // Engage fills its own pair in engage_apply; the TotK fields stay at their defaults
+        out[0] = E_draw[0] ? E_draw[0] : BASE_W, out[1] = E_draw[1] ? E_draw[1] : BASE_H;
+        scene[0] = E_scene[0] ? E_scene[0] : SCENE_W, scene[1] = E_scene[1] ? E_scene[1] : SCENE_H;
+        return;
+    }
     decide();
     out[0] = R.on ? R.ow : BASE_W, out[1] = R.on ? R.oh : BASE_H;
     scene[0] = R.on ? R.sw : SCENE_W, scene[1] = R.on ? R.sh : SCENE_H;

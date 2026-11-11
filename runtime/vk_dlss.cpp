@@ -470,6 +470,7 @@ static int init_pipelines(VkCtx *c) {
 
 static sl::DLSSMode mode_of(const char *m) {
     if (!strcmp(m, "quality")) return sl::DLSSMode::eMaxQuality;
+    if (!strcmp(m, "balanced")) return sl::DLSSMode::eBalanced;
     if (!strcmp(m, "performance")) return sl::DLSSMode::eMaxPerformance;
     if (!strcmp(m, "ultra")) return sl::DLSSMode::eUltraPerformance;
     return sl::DLSSMode::eDLAA;
@@ -530,16 +531,36 @@ int vk_dlss_record(VkCommandBuffer cb, unsigned slot, VkImage src, VkFormat fmt,
     }
     sl::DLSSMode m = mode_of(cfg_value("TOTK_DLSS_MODE"));
     uint32_t iw = (uint32_t)cw, ih = (uint32_t)ch;
-    // DLSS's output is the game resolution after the window limit (resolution.c E_target); the game drew at
-    // the mode's lower size, so this is the upscale that mode means. The present then fits that picture into
-    // the window rectangle, as it does for FSR's output.
-    unsigned target[2];
-    res_engage_target(target);
-    uint32_t ow = target[0] >= iw ? (target[0] & ~1u) : iw, oh = target[1] >= ih ? (target[1] & ~1u) : ih;
-    if (!target[0] || !target[1]) {
-        ow = (uint32_t)dw > iw ? ((uint32_t)dw & ~1u) : iw;
-        oh = (uint32_t)dh > ih ? ((uint32_t)dh & ~1u) : ih;
+    // DLSS accepts an output only at the ratio its mode names (DLAA 1, quality 1.5, balanced 1/0.58, performance 2,
+    // ultra performance 3); anything else is InvalidParameter (0xbad00005). The game rebuilds its buffers on its own
+    // schedule, so right after a change it still draws the size of the previous setting. So the mode used for this
+    // frame is the requested one when its ratio fits the resolution asked for, and the next smaller one while the game
+    // still draws too large: frames stay valid and reach the requested mode as soon as the rebuild lands.
+    unsigned rw2[2];
+    res_engage_target(rw2);
+    uint32_t capw = rw2[0] ? rw2[0] : (uint32_t)dw, caph = rw2[1] ? rw2[1] : (uint32_t)dh;
+    if (dw && capw > (uint32_t)dw) capw = (uint32_t)dw;
+    if (dh && caph > (uint32_t)dh) caph = (uint32_t)dh;
+    // largest ratio first; the requested mode's ratio is the ceiling
+    static const struct { double ratio; sl::DLSSMode mode; } kLadder[] = {
+        {3.0, sl::DLSSMode::eUltraPerformance}, {2.0, sl::DLSSMode::eMaxPerformance},
+        {1.0 / 0.58, sl::DLSSMode::eBalanced}, {1.5, sl::DLSSMode::eMaxQuality}, {1.0, sl::DLSSMode::eDLAA},
+    };
+    double want = 1.0;
+    for (size_t i = 0; i < sizeof kLadder / sizeof *kLadder; i++)
+        if (kLadder[i].mode == m) { want = kLadder[i].ratio; break; }
+    double ratio = 1.0;
+    for (size_t i = 0; i < sizeof kLadder / sizeof *kLadder; i++) {
+        if (kLadder[i].ratio > want + 0.01) continue;   // never sharper than the mode the player chose
+        uint32_t tw = (uint32_t)(iw * kLadder[i].ratio + 0.5), th = (uint32_t)(ih * kLadder[i].ratio + 0.5);
+        if (capw && tw > capw) continue;
+        if (caph && th > caph) continue;
+        ratio = kLadder[i].ratio;
+        m = kLadder[i].mode;
+        break;
     }
+    uint32_t ow = (uint32_t)(iw * ratio + 0.5) & ~1u;
+    uint32_t oh = (uint32_t)(ih * ratio + 0.5) & ~1u;
     if (!ensure_images(c, iw, ih, ow, oh)) return 0;
     slot %= SLOTS;
     if (D.src_view[slot]) vkDestroyImageView(c->device, D.src_view[slot], NULL);

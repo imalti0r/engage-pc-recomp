@@ -79,11 +79,12 @@ const int rt_game_id=1, rt_game_version=200;
 static const char *output, *scale;
 static unsigned char page[4096];
 static int enabled[2];
-const char *cfg_value(const char *key) { return !strcmp(key,"TOTK_OUTPUT_RES") ? output : scale; }
+const char *cfg_value(const char *key) { return !strcmp(key,"TOTK_WINDOW_SIZE") ? output : scale; }
 int rt_patch_set(const char *name) { return !strcmp(name,"engage_output") ? 0 : !strcmp(name,"engage_scene") ? 1 : -1; }
 void rt_patch_switch(int set,int on) { assert(set>=0 && set<2); enabled[set]=on; }
 void *rt_patch_page(void) { return page; }
 void rt_log(const char *fmt,...) {}
+void oe_push_message(unsigned message) {}
 int gfx_window_monitor_size(int *w, int *h) { *w = 0; *h = 0; return 0; }
 void fs_init(void) { abort(); }
 int cfg_int(const char *key) { abort(); }
@@ -110,7 +111,7 @@ int main(int argc,char **argv) {
             cases = [('1280x720', '50', 1280, 1, .5), ('1600x900', '75', 1600, 1, .75),
                      ('1920x1080', '100', 1920, 1, 1), ('2560x1440', '150', 2560, 1, 1.5),
                      ('3200x1800', '100', 3200, 1, 1), ('3840x2160', '100', 3840, 1, 1),
-                     ('1920x1080', 'game', 1920, 0, 1), ('3440x1440', 'game', 1920, 0, 1),
+                     ('1920x1080', 'game', 1920, 0, 1), ('3440x1440', 'game', 2560, 0, 1),
                      ('1280x720junk', '75', 1920, 1, .75)]
             cases += [('1920x1080', value, 1920, 0, 1)
                       for value in ('nan', 'inf', '0', '49', '151', '200', 'bad', '75%')]

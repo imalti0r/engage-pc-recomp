@@ -1,29 +1,31 @@
 # Engage resolution controls
 
-Engage 2.0.0 has separate controls for the game output and its 3D scene in
-F1 → Screen → Picture. Both require a restart.
+Engage 2.0.0 draws at the window's size: the window is the game resolution (there
+is no separate game-resolution row). Two more controls say how that resolution is
+produced, in F1 → Screen → Picture, and a change takes effect at once — no restart.
 
-- Game resolution: 1280×720, 1600×900, 1920×1080, 2560×1440, 3200×1800 or
-  3840×2160. This changes
-  the game's output buffers and interface resolution, independently of window size.
 - 3D render scale: Game, 50%, 75%, 100% or 150%. Game preserves Engage's own
   scene-dependent scale. A percentage overrides the render-pipeline camera scale;
   150% supersamples the scene and costs more GPU time and memory.
+- Upscaler (Scaling to the window): AMD FSR 1, Bilinear or NVIDIA DLSS. With
+  DLSS, the mode (DLAA / Quality / Performance / Ultra performance) divides the
+  resolution the game draws at: Quality draws 1.5× smaller, Performance 2×,
+  Ultra performance 3×, and DLSS upscales the picture back to the window's size.
+  DLAA draws at the window's size and only anti-aliases.
 
 The same settings can be written in `engage.ini` next to `engage.exe`:
 
 ```ini
 [display]
-output_res = 1920x1080
+window_size = 1920x1080
 render_scale = game
 ```
 
-`TOTK_OUTPUT_RES` and `TOTK_RENDER_SCALE` environment variables override the file.
-Unsupported output sizes fall back to 1920×1080. Invalid scales or percentages
-outside 50–150 fall back to Game. Non-16:9 output sizes and resolutions above
-3840×2160
-are not offered. Window scaling, FSR presentation and color adjustment remain
-separate settings.
+`TOTK_WINDOW_SIZE` and `TOTK_RENDER_SCALE` environment variables override the file.
+A window size that is not one of the six 16:9 sizes Engage draws (1280×720 …
+3840×2160) makes the game use the nearest smaller one. Invalid scales or
+percentages outside 50–150 fall back to Game. Window scaling, FSR presentation
+and color adjustment remain separate settings.
 
 The guarded Engage patch table changes Unity's screen manager, NVN display-buffer
 storage sizing, device extent and default depth-buffer dimensions together. Changing

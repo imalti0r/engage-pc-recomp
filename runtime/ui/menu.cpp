@@ -52,6 +52,8 @@ void res_sizes(unsigned out[2], unsigned scene[2]);
 const char *vk_dlss_blocked(void);
 int vk_dlss_sizes(unsigned *in_w, unsigned *in_h, unsigned *out_w, unsigned *out_h);
 int vk_dlss_mode(void);
+void res_engage_target(unsigned out[2]);
+void res_engage_sizes(unsigned draw[2], unsigned target[2]);
 double frame_step_limit_hz(void);
 #ifndef RT_GAME_LIBRARY
 extern const int rt_game_id;
@@ -680,13 +682,20 @@ static void tab_screen(float scale) {
     static const UiTextId perf[] = {UI_MENU_PERF_OFF, UI_MENU_PERF_FPS, UI_MENU_PERF_FULL};
     opt_choice("TOTK_PERF_OVERLAY", UI_MENU_PERF_OVERLAY, perf, 3, UI_MENU_PERF_OVERLAY_DESC);
     opt_group(UI_MENU_GRAPHICS);
-    row_output_res();
+    // Engage: the window size IS the game resolution (resolution.c engage_apply), so there is no separate row for
+    // it. The 3D scale and the upscaler then say how that resolution is produced.
+    if (rt_game_id != 1) row_output_res();
     row_render_scale();
     static const UiTextId up[] = {UI_MENU_UPSCALER_FSR, UI_MENU_UPSCALER_BILINEAR, UI_MENU_UPSCALER_DLSS};
     opt_choice("TOTK_UPSCALER", UI_MENU_UPSCALER, up, rt_game_id == 1 ? 3 : 2, UI_MENU_UPSCALER_DESC);
-    static const UiTextId dmode[] = {UI_MENU_DLSS_DLAA, UI_MENU_DLSS_QUALITY, UI_MENU_DLSS_PERFORMANCE, UI_MENU_DLSS_ULTRA};
-    if (rt_game_id == 1) opt_choice("TOTK_DLSS_MODE", UI_MENU_DLSS_MODE, dmode, 4, UI_MENU_DLSS_MODE_DESC);
-    opt_slider("TOTK_SHARPNESS", UI_MENU_SHARPNESS, 0, 100, UI_MENU_SHARPNESS_DESC, 5, "%.0f %%");
+    // The DLSS rows exist only while DLSS is the upscaler: a mode for an upscaler that does not run is noise.
+    if (rt_game_id == 1 && !strcmp(cfg_value("TOTK_UPSCALER"), "dlss")) {
+        static const UiTextId dmode[] = {UI_MENU_DLSS_DLAA, UI_MENU_DLSS_QUALITY, UI_MENU_DLSS_BALANCED,
+                                         UI_MENU_DLSS_PERFORMANCE, UI_MENU_DLSS_ULTRA};
+        opt_choice("TOTK_DLSS_MODE", UI_MENU_DLSS_MODE, dmode, 5, UI_MENU_DLSS_MODE_DESC);
+    }
+    if (rt_game_id != 1 || strcmp(cfg_value("TOTK_UPSCALER"), "dlss"))
+        opt_slider("TOTK_SHARPNESS", UI_MENU_SHARPNESS, 0, 100, UI_MENU_SHARPNESS_DESC, 5, "%.0f %%");
     static const UiTextId aspect[] = {UI_MENU_ASPECT_FIT, UI_MENU_ASPECT_STRETCH};
     opt_choice("TOTK_ASPECT", UI_MENU_ASPECT, aspect, 2, UI_MENU_ASPECT_DESC);
     if (rt_game_id != 1) opt_slider("TOTK_FOV", UI_MENU_FOV, 70, 140, UI_MENU_FOV_DESC, 5, "%.0f %%");
@@ -1162,44 +1171,44 @@ static void perf_label(UiTextId label, const ImVec4 &c) {
 
 static float perf_gb(float mb) { return mb < 0 ? -1 : mb / 1024; }
 
-// The picture lines: the window, the game image the present shows and the 3D scene it holds (resolution.c), how the
-// present scales the image to the window (gfx_present.c, the last present), the frame limit and the presentation mode
-// in use. With DLSS the sizes it worked in get a line of their own: the resolution it rendered at and the one it
-// produced, which is what the window then gets.
+// The picture lines, as the player understands them: the game resolution they chose (never what a DLSS mode or a
+// render percentage did to it), the 3D scene's real render size, and how that resolution is produced. Everything comes
+// from the settings in force (res_engage_sizes), not from the last present: the present still carries the previous
+// sizes for a frame or two after a change, which showed a stale scene against a new game resolution.
 static void perf_picture(const MenuTarget *t, const ImVec4 &c) {
     unsigned out[2], scene[2];
     res_sizes(out, scene);
+    unsigned draw[2] = {0, 0}, target[2] = {0, 0};
+    res_engage_sizes(draw, target);
     unsigned dl_in[2] = {0, 0}, dl_out[2] = {0, 0};
     int dlss = t->scaler == 3 && vk_dlss_sizes(&dl_in[0], &dl_in[1], &dl_out[0], &dl_out[1]);
     char v[7][80];
     UiTextId labels[7];
     int n = 0;
-    snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_SIZE), t->width, t->height);
+    // the game resolution the player picked (TOTK_WINDOW_SIZE). A DLSS mode or a render percentage changes what the
+    // game draws, never this number.
+    snprintf(v[n], sizeof v[n], "%s", cfg_value("TOTK_WINDOW_SIZE"));
     labels[n++] = UI_MENU_OV_WINDOW;
-    if (rt_game_id == 1) {   // the picture the present is given (the crop of the game image): what DLSS reads
-        snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_SIZE), (unsigned)t->image_w, (unsigned)t->image_h);
-        labels[n++] = UI_MENU_OV_OUTPUT;
-    } else {
-        snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_SIZE), (unsigned)t->image_w, (unsigned)t->image_h);
-        labels[n++] = UI_MENU_OV_OUTPUT;
+    // the 3D scene: with DLSS the size it really renders at (Streamline's own bound inputs), else the engine's scene
+    // size. It comes from the last present, not from the settings: the game rebuilds its buffers on its own schedule,
+    // so the settings can be ahead of what is drawn, and the overlay must show what is drawn.
+    if (t->scaler == 3 && dlss) {
+        snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_SIZE), dl_in[0], dl_in[1]);
+        labels[n++] = UI_MENU_OV_SCENE;
+    } else if (scene[0]) {
         snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_SCENE), scene[0], scene[1], scene[0] * 100.0 / out[0]);
         labels[n++] = UI_MENU_OV_SCENE;
     }
-    if (dlss) {
-        // the resolution DLSS rendered at and the one it produced; equal sizes (DLAA) print one
-        if (dl_in[0] == dl_out[0] && dl_in[1] == dl_out[1])
-            snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_SIZE), dl_in[0], dl_in[1]);
-        else
-            snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_DLSS_SIZE), dl_in[0], dl_in[1], dl_out[0], dl_out[1]);
-        labels[n++] = UI_MENU_OV_DLSS_SIZE;
-    }
-    if (t->scaler == 3) {   // NVIDIA DLSS: name the mode it actually ran in, not the one the setting asks for
-        int md = vk_dlss_mode();   // sl::DLSSMode: 1 performance, 2 balanced, 3 quality, 4 ultra performance, 6 DLAA
-        UiTextId mid = md == 1 ? UI_MENU_DLSS_PERFORMANCE
-                     : md == 3 ? UI_MENU_DLSS_QUALITY
-                     : md == 4 ? UI_MENU_DLSS_ULTRA
-                               : UI_MENU_DLSS_DLAA;
-        snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_DLSS), menu_text(mid));
+    // the upscaler and, for DLSS, its mode and the share of the game resolution the picture is really rendered at
+    if (t->scaler == 3) {
+        const char *dm = cfg_value("TOTK_DLSS_MODE");   // what is set: the same value the DLSS rows write
+        UiTextId mid = !strcmp(dm, "quality")   ? UI_MENU_DLSS_QUALITY
+                     : !strcmp(dm, "balanced")  ? UI_MENU_DLSS_BALANCED
+                     : !strcmp(dm, "performance") ? UI_MENU_DLSS_PERFORMANCE
+                     : !strcmp(dm, "ultra")     ? UI_MENU_DLSS_ULTRA
+                                                : UI_MENU_DLSS_DLAA;
+        double pct = dlss && dl_out[0] && dl_in[0] ? dl_in[0] * 100.0 / dl_out[0] : 0.0;
+        snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_DLSS_RATIO), menu_text(mid), pct);
     } else if (t->scaler == 2) {
         int s = cfg_int("TOTK_SHARPNESS");
         snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_FSR), s < 0 ? 0 : s > 100 ? 100 : s);

@@ -73,10 +73,10 @@ static const char *const text_en[UI_TEXT_COUNT] = {
                                   "that size. Above 100 % smooths jagged edges (supersampling) at a high GPU cost.",
     [UI_MENU_RENDER_SCALE_GAME] = "Game (83 %)",
     [UI_MENU_ENGAGE_OUTPUT_DESC] = "The resolution Engage draws its picture and interface in. 16:9 sizes only. "
-                                   "Higher resolutions use more GPU time and memory. Restart required.",
+                                   "Higher resolutions use more GPU time and memory.",
     [UI_MENU_ENGAGE_SCALE_DESC] = "Size of the 3D scene relative to the game resolution. Game lets Engage choose "
                                   "the scale for each scene. A percentage overrides that choice. Above 100 % "
-                                  "supersamples at a high GPU cost. Restart required.",
+                                  "supersamples at a high GPU cost.",
     [UI_MENU_ENGAGE_SCALE_GAME] = "Game (scene dependent)",
     [UI_MENU_UPSCALER] = "Scaling to the window",
     [UI_MENU_UPSCALER_DESC] = "How the picture is scaled when the window is larger than the game resolution. FSR keeps "
@@ -86,8 +86,8 @@ static const char *const text_en[UI_TEXT_COUNT] = {
     [UI_MENU_DLSS_MODE_DESC] = "DLAA anti-aliases the picture at its own resolution; the others render at a lower "
                                "resolution and let DLSS scale it up. On this game's picture without motion vectors, "
                                "fast pans may smear; a static or slowly panning camera looks right.",
-    [UI_MENU_DLSS_DLAA] = "DLAA", [UI_MENU_DLSS_QUALITY] = "Quality", [UI_MENU_DLSS_PERFORMANCE] = "Performance",
-    [UI_MENU_DLSS_ULTRA] = "Ultra performance",
+    [UI_MENU_DLSS_DLAA] = "DLAA", [UI_MENU_DLSS_QUALITY] = "Quality", [UI_MENU_DLSS_BALANCED] = "Balanced",
+    [UI_MENU_DLSS_PERFORMANCE] = "Performance", [UI_MENU_DLSS_ULTRA] = "Ultra performance",
     [UI_MENU_ASPECT] = "Picture shape",
     [UI_MENU_ASPECT_DESC] = "When the window's shape differs from the game resolution's (a 16:9 picture on a 21:9 "
                             "screen): keep the picture's shape with black bars, or stretch it over the window.",
@@ -301,11 +301,11 @@ static const char *const text_en[UI_TEXT_COUNT] = {
     [UI_MENU_OV_FMT_PCT] = "%.0f%%", [UI_MENU_OV_FMT_TEMP] = "%.0f °C", [UI_MENU_OV_FMT_POWER] = "%.0f W",
     [UI_MENU_OV_FMT_MHZ] = "%.0f MHz", [UI_MENU_OV_FMT_GB] = "%.1f GB", [UI_MENU_OV_FMT_GB_OF] = "/ %.1f GB",
     [UI_MENU_OV_GAME_GB] = "game %.1f GB", [UI_MENU_OV_FMT_MS] = "%.2f ms", [UI_MENU_OV_PER_FRAME] = "%.1f per frame",
-    [UI_MENU_OV_WINDOW] = "Window", [UI_MENU_OV_OUTPUT] = "Game image", [UI_MENU_OV_SCENE] = "3D scene",
+    [UI_MENU_OV_WINDOW] = "Game resolution", [UI_MENU_OV_OUTPUT] = "Game image", [UI_MENU_OV_SCENE] = "3D scene",
     [UI_MENU_OV_SCALING] = "Scaling", [UI_MENU_OV_LIMIT] = "Frame limit", [UI_MENU_OV_PRESENT] = "Presentation",
     [UI_MENU_OV_FMT_SIZE] = "%ux%u", [UI_MENU_OV_FMT_SCENE] = "%ux%u, %.0f%%",
     [UI_MENU_OV_FMT_FSR] = "AMD FSR 1, sharpness %d%%", [UI_MENU_OV_SCALE_NONE] = "none (1:1)",
-    [UI_MENU_OV_FMT_DLSS] = "NVIDIA DLSS, %s", [UI_MENU_OV_FMT_DLSS_OFF] = "NVIDIA DLSS off, %s", [UI_MENU_OV_DLSS_SIZE] = "DLSS render", [UI_MENU_OV_FMT_DLSS_SIZE] = "%ux%u -> %ux%u",
+    [UI_MENU_OV_FMT_DLSS] = "NVIDIA DLSS, %s", [UI_MENU_OV_FMT_DLSS_OFF] = "NVIDIA DLSS off, %s", [UI_MENU_OV_FMT_DLSS_RATIO] = "DLSS %s / %.1f%%",
     [UI_MENU_OV_SCALE_BILINEAR] = "bilinear",
 };
 
@@ -368,8 +368,8 @@ static const char *const text_ru[UI_TEXT_COUNT] = {
     [UI_MENU_DLSS_MODE_DESC] = "DLAA сглаживает картинку в её собственном разрешении; остальные отрисовывают её в "
                                "меньшем и доверяют масштабирование DLSS. У этой игры нет векторов движения: при быстрой "
                                "панораме возможно смазывание, статичная или медленная камера выглядит правильно.",
-    [UI_MENU_DLSS_DLAA] = "DLAA", [UI_MENU_DLSS_QUALITY] = "Качество", [UI_MENU_DLSS_PERFORMANCE] = "Производительность",
-    [UI_MENU_DLSS_ULTRA] = "Ультра производительность",
+    [UI_MENU_DLSS_DLAA] = "DLAA", [UI_MENU_DLSS_QUALITY] = "Качество", [UI_MENU_DLSS_BALANCED] = "Баланс",
+    [UI_MENU_DLSS_PERFORMANCE] = "Производительность", [UI_MENU_DLSS_ULTRA] = "Ультра производительность",
     [UI_MENU_ASPECT] = "Форма картинки",
     [UI_MENU_ASPECT_DESC] = "Когда форма окна отличается от разрешения игры (картинка 16:9 на экране 21:9): сохранить "
                             "форму картинки с чёрными полосами или растянуть её на всё окно.",
@@ -590,11 +590,11 @@ static const char *const text_ru[UI_TEXT_COUNT] = {
     [UI_MENU_OV_FMT_PCT] = "%.0f%%", [UI_MENU_OV_FMT_TEMP] = "%.0f °C", [UI_MENU_OV_FMT_POWER] = "%.0f Вт",
     [UI_MENU_OV_FMT_MHZ] = "%.0f МГц", [UI_MENU_OV_FMT_GB] = "%.1f ГБ", [UI_MENU_OV_FMT_GB_OF] = "/ %.1f ГБ",
     [UI_MENU_OV_GAME_GB] = "игра %.1f ГБ", [UI_MENU_OV_FMT_MS] = "%.2f мс", [UI_MENU_OV_PER_FRAME] = "%.1f за кадр",
-    [UI_MENU_OV_WINDOW] = "Окно", [UI_MENU_OV_OUTPUT] = "Изображение игры", [UI_MENU_OV_SCENE] = "3D-сцена",
+    [UI_MENU_OV_WINDOW] = "Разрешение игры", [UI_MENU_OV_OUTPUT] = "Изображение игры", [UI_MENU_OV_SCENE] = "3D-сцена",
     [UI_MENU_OV_SCALING] = "Масштабирование", [UI_MENU_OV_LIMIT] = "Лимит кадров", [UI_MENU_OV_PRESENT] = "Вывод кадров",
     [UI_MENU_OV_FMT_SIZE] = "%ux%u", [UI_MENU_OV_FMT_SCENE] = "%ux%u, %.0f%%",
     [UI_MENU_OV_FMT_FSR] = "AMD FSR 1, резкость %d%%", [UI_MENU_OV_SCALE_NONE] = "нет (1:1)",
-    [UI_MENU_OV_FMT_DLSS] = "NVIDIA DLSS, %s", [UI_MENU_OV_FMT_DLSS_OFF] = "NVIDIA DLSS off, %s", [UI_MENU_OV_DLSS_SIZE] = "DLSS render", [UI_MENU_OV_FMT_DLSS_SIZE] = "%ux%u -> %ux%u",
+    [UI_MENU_OV_FMT_DLSS] = "NVIDIA DLSS, %s", [UI_MENU_OV_FMT_DLSS_OFF] = "NVIDIA DLSS off, %s", [UI_MENU_OV_FMT_DLSS_RATIO] = "DLSS %s / %.1f%%",
     [UI_MENU_OV_SCALE_BILINEAR] = "билинейное",
 };
 
@@ -651,16 +651,16 @@ static const char *const text_zh_hans[UI_TEXT_COUNT] = {
     [UI_MENU_RENDER_SCALE] = "3D 渲染比例",
     [UI_MENU_RENDER_SCALE_DESC] = "3D 场景相对游戏分辨率的大小；游戏自带的 FSR 会将其缩放到该尺寸。高于 100% 可平滑锯齿（超采样），GPU 开销很高。",
     [UI_MENU_RENDER_SCALE_GAME] = "游戏（83%）",
-    [UI_MENU_ENGAGE_OUTPUT_DESC] = "Engage 绘制画面与界面的分辨率。仅支持 16:9 尺寸。更高的分辨率消耗更多 GPU 时间与内存。需重启生效。",
-    [UI_MENU_ENGAGE_SCALE_DESC] = "3D 场景相对游戏分辨率的大小。“游戏”由 Engage 为每个场景自行选择比例；填百分比可覆盖该选择。高于 100% 为超采样，GPU 开销很高。需重启生效。",
+    [UI_MENU_ENGAGE_OUTPUT_DESC] = "Engage 绘制画面与界面的分辨率。仅支持 16:9 尺寸。更高的分辨率消耗更多 GPU 时间与内存。",
+    [UI_MENU_ENGAGE_SCALE_DESC] = "3D 场景相对游戏分辨率的大小。“游戏”由 Engage 为每个场景自行选择比例；填百分比可覆盖该选择。高于 100% 为超采样，GPU 开销很高。",
     [UI_MENU_ENGAGE_SCALE_GAME] = "游戏（按场景而定）",
     [UI_MENU_UPSCALER] = "缩放到窗口",
     [UI_MENU_UPSCALER_DESC] = "窗口大于游戏分辨率时画面如何缩放。FSR 比双线性更锐利地保留边缘与细节。",
     [UI_MENU_UPSCALER_FSR] = "AMD FSR 1", [UI_MENU_UPSCALER_BILINEAR] = "双线性", [UI_MENU_UPSCALER_DLSS] = "NVIDIA DLSS",
     [UI_MENU_DLSS_MODE] = "DLSS 模式",
     [UI_MENU_DLSS_MODE_DESC] = "DLAA 在画面自身分辨率上做抗锯齿；其余档位以较低分辨率渲染再由 DLSS 放大。本作画面没有运动向量，快速运镜可能拖影；静止或缓慢运镜时效果正常。",
-    [UI_MENU_DLSS_DLAA] = "DLAA", [UI_MENU_DLSS_QUALITY] = "质量", [UI_MENU_DLSS_PERFORMANCE] = "性能",
-    [UI_MENU_DLSS_ULTRA] = "极致性能",
+    [UI_MENU_DLSS_DLAA] = "DLAA", [UI_MENU_DLSS_QUALITY] = "质量", [UI_MENU_DLSS_BALANCED] = "平衡",
+    [UI_MENU_DLSS_PERFORMANCE] = "性能", [UI_MENU_DLSS_ULTRA] = "超级性能",
     [UI_MENU_ASPECT] = "画面形状",
     [UI_MENU_ASPECT_DESC] = "当窗口形状与游戏分辨率不同（16:9 画面放在 21:9 屏上）：用黑边保持画面形状，或将画面拉伸铺满窗口。",
     [UI_MENU_ASPECT_FIT] = "黑边", [UI_MENU_ASPECT_STRETCH] = "拉伸",
@@ -857,11 +857,11 @@ static const char *const text_zh_hans[UI_TEXT_COUNT] = {
     [UI_MENU_OV_FMT_PCT] = "%.0f%%", [UI_MENU_OV_FMT_TEMP] = "%.0f °C", [UI_MENU_OV_FMT_POWER] = "%.0f W",
     [UI_MENU_OV_FMT_MHZ] = "%.0f MHz", [UI_MENU_OV_FMT_GB] = "%.1f GB", [UI_MENU_OV_FMT_GB_OF] = "/ %.1f GB",
     [UI_MENU_OV_GAME_GB] = "游戏 %.1f GB", [UI_MENU_OV_FMT_MS] = "%.2f ms", [UI_MENU_OV_PER_FRAME] = "每帧 %.1f",
-    [UI_MENU_OV_WINDOW] = "窗口", [UI_MENU_OV_OUTPUT] = "游戏图像", [UI_MENU_OV_SCENE] = "3D 场景",
+    [UI_MENU_OV_WINDOW] = "游戏分辨率", [UI_MENU_OV_OUTPUT] = "游戏图像", [UI_MENU_OV_SCENE] = "3D 场景分辨率",
     [UI_MENU_OV_SCALING] = "缩放", [UI_MENU_OV_LIMIT] = "帧率上限", [UI_MENU_OV_PRESENT] = "呈现",
     [UI_MENU_OV_FMT_SIZE] = "%ux%u", [UI_MENU_OV_FMT_SCENE] = "%ux%u，%.0f%%",
     [UI_MENU_OV_FMT_FSR] = "AMD FSR 1，锐化 %d%%", [UI_MENU_OV_SCALE_NONE] = "无（1:1）",
-    [UI_MENU_OV_FMT_DLSS] = "NVIDIA DLSS，%s", [UI_MENU_OV_FMT_DLSS_OFF] = "NVIDIA DLSS 未启用，%s", [UI_MENU_OV_DLSS_SIZE] = "DLSS 渲染分辨率", [UI_MENU_OV_FMT_DLSS_SIZE] = "%ux%u → %ux%u",
+    [UI_MENU_OV_FMT_DLSS] = "NVIDIA DLSS，%s", [UI_MENU_OV_FMT_DLSS_OFF] = "NVIDIA DLSS 未启用，%s", [UI_MENU_OV_FMT_DLSS_RATIO] = "DLSS %s / %.1f%%",
     [UI_MENU_OV_SCALE_BILINEAR] = "双线性",
 };
 SWKBD_ONLY(text_zh_hant, "文字輸入", "請輸入名字", "馬兒", "確定", "取消", "手把：A 確定，B 取消");
