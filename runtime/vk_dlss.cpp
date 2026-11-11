@@ -530,15 +530,14 @@ int vk_dlss_record(VkCommandBuffer cb, unsigned slot, VkImage src, VkFormat fmt,
     }
     sl::DLSSMode m = mode_of(cfg_value("TOTK_DLSS_MODE"));
     uint32_t iw = (uint32_t)cw, ih = (uint32_t)ch;
-    uint32_t ow = iw, oh = ih;
-    if (dw > iw || dh > ih) {   // the window is larger than the picture: the mode's ratio, capped by the window
-        double ratio = m == sl::DLSSMode::eMaxQuality ? 1.5 : m == sl::DLSSMode::eMaxPerformance ? 2.0
-                                             : m == sl::DLSSMode::eUltraPerformance ? 3.0 : 1.0;
-        ow = (uint32_t)(iw * ratio + 0.5);
-        oh = (uint32_t)(ih * ratio + 0.5);
-        ow = ow > dw ? dw : ow;
-        oh = oh > dh ? dh : oh;
-    }
+    // DLSS's output is the game resolution the player chose (TOTK_OUTPUT_RES); the game drew at the
+    // mode's lower resolution (resolution.c dlss_shrink), so this is the upscale that mode means. The
+    // present then brings that picture into the window rectangle, as it does for FSR's output.
+    uint32_t tw = (uint32_t)dw, th = (uint32_t)dh;   // dw/dh: the rectangle in the swapchain (the window)
+    unsigned target[2], scene[2];
+    res_sizes(target, scene);
+    uint32_t ow = target[0] ? target[0] : iw, oh = target[1] ? target[1] : ih;
+    (void)tw, (void)th;
     if (!ensure_images(c, iw, ih, ow, oh)) return 0;
     slot %= SLOTS;
     if (D.src_view[slot]) vkDestroyImageView(c->device, D.src_view[slot], NULL);

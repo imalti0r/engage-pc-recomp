@@ -194,6 +194,17 @@ void res_heapdef_served(void) { R.heapdef_ok = 1; }
 // ---- start: the patch page and the sets
 static uint64_t pack(unsigned w, unsigned h) { return (uint64_t)h << 32 | w; }
 
+// The DLSS mode's upscale ratio (see vk_dlss.cpp mode_of): the game draws at 1/ratio of the target resolution and
+// DLSS brings it up. DLAA (and FSR, which scales on the present) keeps the target size.
+static float dlss_shrink(void) {
+    if (strcmp(cfg_value("TOTK_UPSCALER"), "dlss")) return 1.0f;
+    const char *m = cfg_value("TOTK_DLSS_MODE");
+    if (!strcmp(m, "quality")) return 1.5f;
+    if (!strcmp(m, "performance")) return 2.0f;
+    if (!strcmp(m, "ultra")) return 3.0f;
+    return 1.0f;   // DLAA, and anything unknown
+}
+
 static void engage_init(void) {
     unsigned w = BASE_W, h = BASE_H;
     const char *o = cfg_value("TOTK_OUTPUT_RES"), *s = cfg_value("TOTK_RENDER_SCALE");
@@ -205,6 +216,16 @@ static void engage_init(void) {
          (ow == 3200 && oh == 1800) || (ow == 3840 && oh == 2160))) {
         w = ow, h = oh;
     } else rt_log("resolution: Engage does not support %s; using 1920x1080", o);
+    // DLSS Quality/Performance/Ultra Performance: the game draws smaller and DLSS upscales to the size above,
+    // which is what the window presents (vk_dlss.cpp caps its output at the window and takes the ratio from there)
+    const float shrink = dlss_shrink();
+    if (shrink > 1.0f) {
+        unsigned rw = (unsigned)(w / shrink + 0.5f) & ~1u, rh = (unsigned)(h / shrink + 0.5f) & ~1u;
+        if (rw >= 1280 && rh >= 720) {
+            rt_log("resolution: DLSS x%.2f: the game draws %ux%u and DLSS upscales to %ux%u", shrink, rw, rh, w, h);
+            w = rw, h = rh;
+        } else rt_log("resolution: DLSS x%.2f on %ux%u would draw below 1280x720; the game keeps %ux%u", shrink, w, h, w, h);
+    }
     float scale = 1;
     int fixed = strcmp(s, "game") != 0;
     if (fixed) {
