@@ -247,6 +247,13 @@ static int create_device(void) {
         CHAIN(lr, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_LOCAL_READ_FEATURES_KHR);
     }
     if (has_ext(ep, ne, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME)) { g_vk.has_memory_budget = 1; ext[n_ext++] = VK_EXT_MEMORY_BUDGET_EXTENSION_NAME; }
+    // Streamline's DLSS (vk_dlss.cpp): NGX's Vulkan cubins need NVIDIA's binary import
+    if (!strcmp(cfg_value("TOTK_UPSCALER"), "dlss") && has_ext(ep, ne, VK_NVX_BINARY_IMPORT_EXTENSION_NAME) &&
+        has_ext(ep, ne, VK_NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME)) {
+        ext[n_ext++] = VK_NVX_BINARY_IMPORT_EXTENSION_NAME;
+        ext[n_ext++] = VK_NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME;
+        rt_log("vk: NVX binary import + image view handle on for Streamline's DLSS");
+    }
     // GPU breadcrumbs for a lost device (vk_crumbs.c): AMD's drivers and RADV report it.
     if (has_ext(ep, ne, VK_AMD_BUFFER_MARKER_EXTENSION_NAME)) { g_vk.has_buffer_marker = 1; ext[n_ext++] = VK_AMD_BUFFER_MARKER_EXTENSION_NAME; }
     // Graphics pipeline library: chained last so it can be dropped again when vk_caps_gpl declines it.
@@ -313,6 +320,7 @@ static int create_device(void) {
     VkResult r = vkCreateDevice(g_vk.phys, &di, NULL, &g_vk.device);
     free(c);
     if (r != VK_SUCCESS) { rt_log("vk: vkCreateDevice failed (%d)", (int)r); return 0; }
+    vk_dlss_set_device(g_vk.instance, g_vk.phys, g_vk.device, g_vk.gfx_family, 0);
     vkGetDeviceQueue(g_vk.device, g_vk.gfx_family, 0, &g_vk.gfx_queue);
     if (g_vk.xfer_family != g_vk.gfx_family) vkGetDeviceQueue(g_vk.device, g_vk.xfer_family, 0, &g_vk.xfer_queue);
     else { g_vk.xfer_queue = g_vk.gfx_queue; g_vk.xfer_shared = 1; }

@@ -1,0 +1,22 @@
+#version 450
+// DLSS output (runtime/vk_dlss.c): DLSS's linear RGBA16F result encoded back into the present's
+// display encoding. An RGBA8 UNORM image: the 1:1 blit into the swapchain maps the named channels
+// red to red, green to green, whatever the swapchain's channel order is.
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(binding = 0) uniform sampler2D src;
+layout(binding = 1, rgba8) uniform writeonly image2D dst;
+layout(push_constant) uniform P {
+    ivec2 size;   // the size of both images
+} pc;
+
+vec3 linear_to_srgb(vec3 c) {
+    c = clamp(c, 0.0, 1.0);
+    return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, greaterThan(c, vec3(0.0031308)));
+}
+
+void main() {
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(p, pc.size))) return;
+    vec3 c = linear_to_srgb(texelFetch(src, p, 0).rgb);
+    imageStore(dst, p, vec4(c, 1.0));
+}

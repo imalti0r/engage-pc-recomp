@@ -201,7 +201,8 @@ static void engage_init(void) {
     unsigned ow, oh;
     if (sscanf(o, "%ux%u%c", &ow, &oh, &tail) == 2 &&
         ((ow == 1280 && oh == 720) || (ow == 1600 && oh == 900) ||
-         (ow == 1920 && oh == 1080) || (ow == 2560 && oh == 1440))) {
+         (ow == 1920 && oh == 1080) || (ow == 2560 && oh == 1440) ||
+         (ow == 3200 && oh == 1800) || (ow == 3840 && oh == 2160))) {
         w = ow, h = oh;
     } else rt_log("resolution: Engage does not support %s; using 1920x1080", o);
     float scale = 1;

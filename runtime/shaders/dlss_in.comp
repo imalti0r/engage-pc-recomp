@@ -1,0 +1,23 @@
+#version 450
+// DLSS input (runtime/vk_dlss.c): the present's picture, crop rectangle at offset, decoded from its
+// display encoding into linear light in an RGBA16F image for NVIDIA DLSS (DLAA / Super Resolution).
+// The stored values are sRGB display-encoded, whatever container they come from (the game's UNORM
+// display buffers or the colour adjustment's re-encoded RGBA16F).
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(binding = 0) uniform sampler2D src;
+layout(binding = 1, rgba16f) uniform writeonly image2D dst;
+layout(push_constant) uniform P {
+    ivec2 offset;   // the crop rectangle's corner in src
+    ivec2 size;     // its size, the size of dst
+} pc;
+
+vec3 srgb_to_linear(vec3 c) {
+    return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), greaterThan(c, vec3(0.04045)));
+}
+
+void main() {
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(p, pc.size))) return;
+    vec3 c = clamp(texelFetch(src, p + pc.offset, 0).rgb, 0.0, 1.0);
+    imageStore(dst, p, vec4(srgb_to_linear(c), 1.0));
+}

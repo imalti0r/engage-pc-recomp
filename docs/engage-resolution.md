@@ -3,7 +3,8 @@
 Engage 2.0.0 has separate controls for the game output and its 3D scene in
 F1 → Screen → Picture. Both require a restart.
 
-- Game resolution: 1280×720, 1600×900, 1920×1080 or 2560×1440. This changes
+- Game resolution: 1280×720, 1600×900, 1920×1080, 2560×1440, 3200×1800 or
+  3840×2160. This changes
   the game's output buffers and interface resolution, independently of window size.
 - 3D render scale: Game, 50%, 75%, 100% or 150%. Game preserves Engage's own
   scene-dependent scale. A percentage overrides the render-pipeline camera scale;
@@ -19,7 +20,8 @@ render_scale = game
 
 `TOTK_OUTPUT_RES` and `TOTK_RENDER_SCALE` environment variables override the file.
 Unsupported output sizes fall back to 1920×1080. Invalid scales or percentages
-outside 50–150 fall back to Game. Non-16:9 output sizes and higher resolutions
+outside 50–150 fall back to Game. Non-16:9 output sizes and resolutions above
+3840×2160
 are not offered. Window scaling, FSR presentation and color adjustment remain
 separate settings.
 

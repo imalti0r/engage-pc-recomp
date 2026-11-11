@@ -102,6 +102,22 @@ void vk_present_blit(VkImage src, VkImageLayout layout, VkFormat fmt, int w, int
 int vk_fsr_record(VkCommandBuffer cb, unsigned slot, VkImage src, VkFormat fmt, int sw, int sh, const int crop[4],
                   VkImage dst, const int out[4]);
 void vk_fsr_release(void);   // before the device goes away
+// NVIDIA DLSS through Streamline (vk_dlss.cpp): vk_dlss_set_device right after the device exists
+// loads Streamline (sl.interposer.dll + sl.common/sl.dlss/nvngx_dlss.dll from upscalers\streamline
+// or TOTK_DLSS_DIR), runs slInit and hands the real handles over with slSetVulkanInfo — no
+// interposer hooks (their proxies break this port's guest threads). Then DLAA at the picture's own
+// size, or the mode's ratio (TOTK_DLSS_MODE) into the rectangle out of dst, in place of FSR. src is
+// in GENERAL, fmt its format, dstfmt the swapchain's format. 0 = nothing recorded (Engage only, the
+// setting says otherwise, or DLSS is not available): the caller falls back to FSR or the blit.
+void vk_dlss_set_device(VkInstance inst, VkPhysicalDevice phys, VkDevice dev, unsigned gfx_family, unsigned gfx_index);
+void vk_dlss_iat_patch(void *inst, void *dev);
+int vk_dlss_record(VkCommandBuffer cb, unsigned slot, VkImage src, VkFormat fmt, int sw, int sh, const int crop[4],
+                   VkImage dst, const int out[4], VkFormat dstfmt);
+// Streamline's per-frame present bookkeeping: call before the real vkQueuePresentKHR (returns 1 when
+// its hook ran and the present should proceed) and after it.
+int vk_dlss_present_before(VkQueue queue, const VkPresentInfoKHR *pi);
+void vk_dlss_present_after(void);
+void vk_dlss_release(void);  // before the device goes away
 // Colour adjustment on the present (vk_color.c): with TOTK_COLOR_* away from their defaults or an sRGB source,
 // records a pass that preserves display encoding and writes src's crop rectangle {x, y, w, h}, adjusted, into an RGBA16F
 // image of that size in GENERAL and returns it (the caller

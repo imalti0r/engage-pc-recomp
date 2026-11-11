@@ -81,7 +81,13 @@ static const char *const text_en[UI_TEXT_COUNT] = {
     [UI_MENU_UPSCALER] = "Scaling to the window",
     [UI_MENU_UPSCALER_DESC] = "How the picture is scaled when the window is larger than the game resolution. FSR keeps "
                               "edges and detail sharper than bilinear.",
-    [UI_MENU_UPSCALER_FSR] = "AMD FSR 1", [UI_MENU_UPSCALER_BILINEAR] = "Bilinear",
+    [UI_MENU_UPSCALER_FSR] = "AMD FSR 1", [UI_MENU_UPSCALER_BILINEAR] = "Bilinear", [UI_MENU_UPSCALER_DLSS] = "NVIDIA DLSS",
+    [UI_MENU_DLSS_MODE] = "DLSS mode",
+    [UI_MENU_DLSS_MODE_DESC] = "DLAA anti-aliases the picture at its own resolution; the others render at a lower "
+                               "resolution and let DLSS scale it up. On this game's picture without motion vectors, "
+                               "fast pans may smear; a static or slowly panning camera looks right.",
+    [UI_MENU_DLSS_DLAA] = "DLAA", [UI_MENU_DLSS_QUALITY] = "Quality", [UI_MENU_DLSS_PERFORMANCE] = "Performance",
+    [UI_MENU_DLSS_ULTRA] = "Ultra performance",
     [UI_MENU_ASPECT] = "Picture shape",
     [UI_MENU_ASPECT_DESC] = "When the window's shape differs from the game resolution's (a 16:9 picture on a 21:9 "
                             "screen): keep the picture's shape with black bars, or stretch it over the window.",
@@ -356,7 +362,13 @@ static const char *const text_ru[UI_TEXT_COUNT] = {
     [UI_MENU_UPSCALER] = "Масштабирование под окно",
     [UI_MENU_UPSCALER_DESC] = "Как картинка растягивается, когда окно больше разрешения игры. FSR сохраняет края и "
                               "детали чётче билинейного.",
-    [UI_MENU_UPSCALER_FSR] = "AMD FSR 1", [UI_MENU_UPSCALER_BILINEAR] = "Билинейное",
+    [UI_MENU_UPSCALER_FSR] = "AMD FSR 1", [UI_MENU_UPSCALER_BILINEAR] = "Билинейное", [UI_MENU_UPSCALER_DLSS] = "NVIDIA DLSS",
+    [UI_MENU_DLSS_MODE] = "Режим DLSS",
+    [UI_MENU_DLSS_MODE_DESC] = "DLAA сглаживает картинку в её собственном разрешении; остальные отрисовывают её в "
+                               "меньшем и доверяют масштабирование DLSS. У этой игры нет векторов движения: при быстрой "
+                               "панораме возможно смазывание, статичная или медленная камера выглядит правильно.",
+    [UI_MENU_DLSS_DLAA] = "DLAA", [UI_MENU_DLSS_QUALITY] = "Качество", [UI_MENU_DLSS_PERFORMANCE] = "Производительность",
+    [UI_MENU_DLSS_ULTRA] = "Ультра производительность",
     [UI_MENU_ASPECT] = "Форма картинки",
     [UI_MENU_ASPECT_DESC] = "Когда форма окна отличается от разрешения игры (картинка 16:9 на экране 21:9): сохранить "
                             "форму картинки с чёрными полосами или растянуть её на всё окно.",

@@ -1,5 +1,6 @@
 # Reference checkouts of upstream projects (cloned locally, never committed)
 /refs/
+/tools/vendor/
 
 # Downloaded toolchain binaries and Python environments
 /toolchain/

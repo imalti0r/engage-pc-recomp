@@ -260,7 +260,9 @@ static void flip_locked(void) {
                            .pWaitSemaphores = &g_render_done[g_flip_idx], .swapchainCount = 1, .pSwapchains = &g_sc,
                            .pImageIndices = &g_flip_idx};
     vk_queue_lock();
+    int dlss_present = vk_dlss_present_before(vk_ctx()->gfx_queue, &pi);
     VkResult r = vkQueuePresentKHR(vk_ctx()->gfx_queue, &pi);
+    if (dlss_present) vk_dlss_present_after();
     vk_queue_unlock();
     vk_device_fault_report(r);
     if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR) plat_xchg32(&g_dirty, 1);
@@ -602,9 +604,11 @@ static void present_image(VkImage src, VkImageLayout layout, VkFormat fmt, int w
     VkImage psrc = graded ? graded : src;
     VkFormat pfmt = graded ? VK_FORMAT_R16G16B16A16_SFLOAT : fmt;
     const int *prect = graded ? grect : rect;
-    // FSR (TOTK_UPSCALER) when the picture's rectangle is larger than the crop; else the bilinear blit
-    int fsr = general && vk_fsr_record(cb, slot, psrc, pfmt, graded ? cw : w, graded ? ch : h, prect, dst, to);
-    g_scaler = fsr ? 2 : cw != to[2] || ch != to[3];
+    // DLSS (TOTK_UPSCALER=dlss, Engage only) in place of FSR (TOTK_UPSCALER) when the picture's rectangle is larger
+    // than the crop, or for DLAA at the picture's own size; else the bilinear blit
+    int scaled = general && vk_dlss_record(cb, slot, psrc, pfmt, graded ? cw : w, graded ? ch : h, prect, dst, to, g_sc_fmt);
+    int fsr = !scaled && general && vk_fsr_record(cb, slot, psrc, pfmt, graded ? cw : w, graded ? ch : h, prect, dst, to);
+    g_scaler = scaled ? 3 : fsr ? 2 : cw != to[2] || ch != to[3];
     if (!fsr) {
         if (general)   // a GENERAL source (vk_texture.c images): earlier submissions' writes become visible to the blit here
             sync_barrier(cb, psrc, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
@@ -727,6 +731,7 @@ void gfx_window_release_vk(void) {
         g_flip_on = 0;   // its blit is done (device idle); the swapchain goes away unpresented
         menu_vk_release();
         vk_fsr_release();
+        vk_dlss_release();
         vk_color_release();
         free_capture();
         free_thumbs();
