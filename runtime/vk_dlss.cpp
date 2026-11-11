@@ -344,6 +344,7 @@ static struct {
     int reset;
     // the last frame DLSS drew, for the overlay (vk_dlss_sizes): the image it read and the picture it wrote
     uint32_t last_iw, last_ih, last_ow, last_oh;
+    int last_mode = -1;
 } D;
 
 static void barrier(VkCommandBuffer cb, VkImage img, VkImageLayout from, VkImageLayout to, VkPipelineStageFlags2 ss,
@@ -671,6 +672,7 @@ int vk_dlss_record(VkCommandBuffer cb, unsigned slot, VkImage src, VkFormat fmt,
     vkCmdBlitImage(cb, D.swp, VK_IMAGE_LAYOUT_GENERAL, dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region,
                    VK_FILTER_LINEAR);
     D.last_iw = iw, D.last_ih = ih, D.last_ow = ow, D.last_oh = oh;
+    D.last_mode = (int)m;
     return 1;
 }
 
@@ -680,6 +682,9 @@ extern "C" int vk_dlss_sizes(unsigned *in_w, unsigned *in_h, unsigned *out_w, un
     *in_w = D.last_iw, *in_h = D.last_ih, *out_w = D.last_ow, *out_h = D.last_oh;
     return D.last_iw && D.last_ow ? 1 : 0;
 }
+
+// The mode the last DLSS frame ran in (sl::DLSSMode), or -1 when it drew nothing.
+extern "C" int vk_dlss_mode(void) { return D.last_iw ? D.last_mode : -1; }
 
 // The present bookkeeping: SL's common plugin counts evaluates between presents and needs its
 // presentCommon() every frame (otherwise internal bookkeeping and garbage collection never run).

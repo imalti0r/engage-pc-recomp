@@ -119,6 +119,9 @@ const char *vk_dlss_blocked(void);
 // The sizes DLSS worked in on the last present (its input and its output), for the overlay: 1 when
 // DLSS drew that frame. Both are 0 when it did not.
 int vk_dlss_sizes(unsigned *in_w, unsigned *in_h, unsigned *out_w, unsigned *out_h);
+// The mode DLSS actually ran in on that frame (sl::DLSSMode: 1 performance, 3 quality, 4 ultra
+// performance, 6 DLAA), or -1 when it did not draw: the overlay names what ran, not what is set.
+int vk_dlss_mode(void);
 // Streamline's per-frame present bookkeeping: call before the real vkQueuePresentKHR (returns 1 when
 // its hook ran and the present should proceed) and after it.
 int vk_dlss_present_before(VkQueue queue, const VkPresentInfoKHR *pi);

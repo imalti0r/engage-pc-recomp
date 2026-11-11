@@ -51,6 +51,7 @@ void vk_queue_unlock(void);
 void res_sizes(unsigned out[2], unsigned scene[2]);
 const char *vk_dlss_blocked(void);
 int vk_dlss_sizes(unsigned *in_w, unsigned *in_h, unsigned *out_w, unsigned *out_h);
+int vk_dlss_mode(void);
 double frame_step_limit_hz(void);
 #ifndef RT_GAME_LIBRARY
 extern const int rt_game_id;
@@ -1192,12 +1193,12 @@ static void perf_picture(const MenuTarget *t, const ImVec4 &c) {
             snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_DLSS_SIZE), dl_in[0], dl_in[1], dl_out[0], dl_out[1]);
         labels[n++] = UI_MENU_OV_DLSS_SIZE;
     }
-    if (t->scaler == 3) {   // NVIDIA DLSS: name the mode in use
-        const char *dm = cfg_value("TOTK_DLSS_MODE");
-        UiTextId mid = !strcmp(dm, "quality")   ? UI_MENU_DLSS_QUALITY
-                     : !strcmp(dm, "performance") ? UI_MENU_DLSS_PERFORMANCE
-                     : !strcmp(dm, "ultra")     ? UI_MENU_DLSS_ULTRA
-                                                : UI_MENU_DLSS_DLAA;
+    if (t->scaler == 3) {   // NVIDIA DLSS: name the mode it actually ran in, not the one the setting asks for
+        int md = vk_dlss_mode();   // sl::DLSSMode: 1 performance, 2 balanced, 3 quality, 4 ultra performance, 6 DLAA
+        UiTextId mid = md == 1 ? UI_MENU_DLSS_PERFORMANCE
+                     : md == 3 ? UI_MENU_DLSS_QUALITY
+                     : md == 4 ? UI_MENU_DLSS_ULTRA
+                               : UI_MENU_DLSS_DLAA;
         snprintf(v[n], sizeof v[n], menu_text(UI_MENU_OV_FMT_DLSS), menu_text(mid));
     } else if (t->scaler == 2) {
         int s = cfg_int("TOTK_SHARPNESS");
