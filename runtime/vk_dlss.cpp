@@ -530,14 +530,13 @@ int vk_dlss_record(VkCommandBuffer cb, unsigned slot, VkImage src, VkFormat fmt,
     }
     sl::DLSSMode m = mode_of(cfg_value("TOTK_DLSS_MODE"));
     uint32_t iw = (uint32_t)cw, ih = (uint32_t)ch;
-    // DLSS's output is the game resolution the player chose (TOTK_OUTPUT_RES); the game drew at the
-    // mode's lower resolution (resolution.c dlss_shrink), so this is the upscale that mode means. The
-    // present then fits that picture into the window rectangle, as it does for FSR's output.
-    uint32_t ow = iw, oh = ih, tw = 0, th = 0;
-    char tail;
-    if (sscanf(cfg_value("TOTK_OUTPUT_RES"), "%ux%u%c", &tw, &th, &tail) == 2 && tw >= iw && th >= ih) {
-        ow = tw & ~1u, oh = th & ~1u;   // whole pixels: an odd size upscales poorly
-    } else {
+    // DLSS's output is the game resolution after the window limit (resolution.c E_target); the game drew at
+    // the mode's lower size, so this is the upscale that mode means. The present then fits that picture into
+    // the window rectangle, as it does for FSR's output.
+    unsigned target[2];
+    res_engage_target(target);
+    uint32_t ow = target[0] >= iw ? (target[0] & ~1u) : iw, oh = target[1] >= ih ? (target[1] & ~1u) : ih;
+    if (!target[0] || !target[1]) {
         ow = (uint32_t)dw > iw ? ((uint32_t)dw & ~1u) : iw;
         oh = (uint32_t)dh > ih ? ((uint32_t)dh & ~1u) : ih;
     }

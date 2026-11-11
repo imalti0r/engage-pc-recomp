@@ -36,6 +36,8 @@
 
 #include "cfg.h"
 #include "host.h"
+// runtime/ui/menu.cpp: the monitor the window is on, for capping the game resolution (0 when unknown)
+int gfx_window_monitor_size(int *w, int *h);
 
 #define BASE_W 1920
 #define BASE_H 1080
@@ -52,6 +54,31 @@ static struct {
     int on;                    // res_init switched the patch sets on
 } R;
 
+// The window's size (TOTK_WINDOW_SIZE), or the monitor's when that is not readable. The game resolution is kept
+// at or below it: a larger picture would be scaled back down on its way to the screen, throwing away what DLSS
+// just upscaled, so every DLSS mode would look the same. 0 when neither is known.
+static void window_cap(int *cw, int *ch) {
+    unsigned w = 0, h = 0;
+    char tail;
+    *cw = *ch = 0;
+    if (sscanf(cfg_value("TOTK_WINDOW_SIZE"), "%ux%u%c", &w, &h, &tail) == 2 && w >= 320 && h >= 240) {
+        *cw = (int)w, *ch = (int)h;
+        return;
+    }
+    gfx_window_monitor_size(cw, ch);
+}
+
+// The largest 16:9-preserving size at or below w x h, even dimensions.
+static void fit_into(unsigned *w, unsigned *h, int cw, int ch) {
+    if (cw <= 0 || ch <= 0 || ((int64_t)*w <= cw && (int64_t)*h <= ch)) return;
+    double f = fmin((double)cw / *w, (double)ch / *h);
+    unsigned nw = (unsigned)(*w * f) & ~1u, nh = (unsigned)(*h * f) & ~1u;
+    if (nw >= 1280 && nh >= 720) {
+        rt_log("resolution: %ux%u is larger than the %dx%d window; %ux%u", *w, *h, cw, ch, nw, nh);
+        *w = nw, *h = nh;
+    }
+}
+
 static void decide(void) {
     if (R.decided) return;
     R.decided = 1;
@@ -61,6 +88,9 @@ static void decide(void) {
     unsigned w = 0, h = 0;
     char tail;
     if (sscanf(o, "%ux%u%c", &w, &h, &tail) == 2 && w >= 1280 && h >= 720 && w <= 7680 && h <= 4320) {
+        int cw, ch;
+        window_cap(&cw, &ch);
+        fit_into(&w, &h, cw, ch);
         R.ow = w & ~1u;
         R.oh = h & ~1u;
     } else {
@@ -205,6 +235,15 @@ static float dlss_shrink(void) {
     return 1.0f;   // DLAA, and anything unknown
 }
 
+// The size DLSS upscales to (Engage): the chosen game resolution after the window limit, before the DLSS mode
+// divides it into the size the game actually draws. Zero until res_init ran.
+static unsigned E_target[2];
+
+void res_engage_target(unsigned out[2]) {
+    out[0] = E_target[0];
+    out[1] = E_target[1];
+}
+
 static void engage_init(void) {
     unsigned w = BASE_W, h = BASE_H;
     const char *o = cfg_value("TOTK_OUTPUT_RES"), *s = cfg_value("TOTK_RENDER_SCALE");
@@ -216,6 +255,14 @@ static void engage_init(void) {
          (ow == 3200 && oh == 1800) || (ow == 3840 && oh == 2160))) {
         w = ow, h = oh;
     } else rt_log("resolution: Engage does not support %s; using 1920x1080", o);
+    // The same limit as decide(): a picture larger than the window is scaled back down on its way to the
+    // screen, which throws away what DLSS's mode upscaled.
+    {
+        int cw, ch;
+        window_cap(&cw, &ch);
+        fit_into(&w, &h, cw, ch);
+    }
+    E_target[0] = w & ~1u, E_target[1] = h & ~1u;
     // DLSS Quality/Performance/Ultra Performance: the game draws smaller and DLSS upscales to the size above,
     // which is what the window presents (vk_dlss.cpp caps its output at the window and takes the ratio from there)
     const float shrink = dlss_shrink();

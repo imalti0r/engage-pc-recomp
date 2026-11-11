@@ -84,6 +84,7 @@ int rt_patch_set(const char *name) { return !strcmp(name,"engage_output") ? 0 : 
 void rt_patch_switch(int set,int on) { assert(set>=0 && set<2); enabled[set]=on; }
 void *rt_patch_page(void) { return page; }
 void rt_log(const char *fmt,...) {}
+int gfx_window_monitor_size(int *w, int *h) { *w = 0; *h = 0; return 0; }
 void fs_init(void) { abort(); }
 int cfg_int(const char *key) { abort(); }
 int main(int argc,char **argv) {

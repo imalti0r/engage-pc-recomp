@@ -122,6 +122,8 @@ int vk_dlss_sizes(unsigned *in_w, unsigned *in_h, unsigned *out_w, unsigned *out
 // The mode DLSS actually ran in on that frame (sl::DLSSMode: 1 performance, 3 quality, 4 ultra
 // performance, 6 DLAA), or -1 when it did not draw: the overlay names what ran, not what is set.
 int vk_dlss_mode(void);
+// The size DLSS upscales to (resolution.c): the game resolution after the window limit.
+void res_engage_target(unsigned out[2]);
 // Streamline's per-frame present bookkeeping: call before the real vkQueuePresentKHR (returns 1 when
 // its hook ran and the present should proceed) and after it.
 int vk_dlss_present_before(VkQueue queue, const VkPresentInfoKHR *pi);
