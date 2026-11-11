@@ -5,7 +5,7 @@ A native Windows port of **Fire Emblem Engage 2.0.0**, built on [TotK Recomp](ht
 [![Source checks](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/badges/main/pipeline.svg)](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/pipelines)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-[Download Windows Setup](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.6/downloads/Engage-Setup-0.1.0-alpha.6-windows.zip) · [Setup guide](docs/installing-engage.md) · [Report a bug](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/issues/new) · [Build from source](docs/building-engage.md)
+[Download Windows Setup](https://github.com/imalti0r/engage-pc-recomp/releases/download/engage-v0.1.0-alpha.9/Engage-Setup-windows.zip) · [Setup guide](docs/installing-engage.md) · [Report a bug](https://github.com/imalti0r/engage-pc-recomp/issues/new) · [Build from source](docs/building-engage.md)
 
 **This is still an early alpha.** The first battle, attack cutscenes and audio work, but the full game hasn't been tested. Expect bugs, and back up your saves.
 
@@ -71,7 +71,7 @@ For a source build, use `Run-Engage.cmd`. Keep `engage_game.dll` beside `engage.
 
 ## Helping out
 
-If something breaks, [open an issue](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/issues/new). Include your version, GPU/driver, what you were doing and how to reproduce it. Check logs for personal paths before sharing them.
+If something breaks, [open an issue](https://github.com/imalti0r/engage-pc-recomp/issues/new). Include your version, GPU/driver, what you were doing and how to reproduce it. Check logs for personal paths before sharing them.
 
 Want to contribute? Read [CONTRIBUTING.md](CONTRIBUTING.md). MRs go into **`dev`**. Small maintainer documentation edits don't need a PR.
 
