@@ -87,3 +87,6 @@ desktop.ini
 
 # Agent task worktrees (tools/worktree.py)
 /.worktrees/
+
+/tools/nx_extract/bin/
+/tools/nx_extract/obj/
