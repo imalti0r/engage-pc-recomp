@@ -1,10 +1,15 @@
 # Copy to config.local.toml and replace these local paths. Never paste key values here.
+#
+# Either give the base game and the update (and any DLC) as separate files, as below, or give one
+# combined cartridge dump (an XCI holding the base game, the 2.0.0 update and the DLC) as `xci`:
+# it then stands in for the base game, the update and every DLC not named separately.
 [input]
 base = 'D:\YourDumps\Engage-base.nsp'
 update = 'D:\YourDumps\Engage-update-2.0.0.nsp'
 keys = 'D:\YourDumps\prod.keys'
 # title_keys = 'D:\YourDumps\title.keys'
 firmware = 'D:\YourDumps\firmware-nca-directory'
+# xci = 'D:\YourDumps\Engage-combined.xci'   # replaces base, update and the DLC fields below
 
 [input.dlc]
 "0100A6301214F001" = 'D:\YourDumps\Engage-expansion-pass.nsp'

@@ -54,6 +54,10 @@ not cover post-battle free walking.
 
    The ignored config uses input.base, input.update, input.keys, optional
    input.title_keys, and input.dlc mapping each DLC title ID to its NSP path.
+   Alternatively input.xci names one combined cartridge dump that holds the
+   base game, the 2.0.0 update and the DLC: it stands in for the base game, the
+   update and every DLC not given as its own file (the wrapper lists its content
+   metas, requires the 2.0.0 patch and adds each add-on content by title ID).
    The wrapper checks exact CNMT title IDs/types/versions before extraction. It
    merges through LibHac with integrity failures treated as errors. It requires a
    new ExeFS/RomFS destination, so interrupted output must be inspected before retrying.
