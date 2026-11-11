@@ -529,7 +529,9 @@ static void row_output_res(void) {
         snprintf(shown[i], sizeof shown[i], "%d × %d", w, h);   // U+00D7, the multiplication sign
         names[i] = shown[i];
     }
-    opt_choice_list("TOTK_OUTPUT_RES", UI_MENU_OUTPUT_RES, vals, names, rt_game_id == 1 ? 4 : N,
+    // Engage takes 16:9 sizes only, the first six entries: 1280x720 up to 3840x2160 (resolution.c
+    // lists the sizes it accepts); TotK gets every entry
+    opt_choice_list("TOTK_OUTPUT_RES", UI_MENU_OUTPUT_RES, vals, names, rt_game_id == 1 ? 6 : N,
                     rt_game_id == 1 ? UI_MENU_ENGAGE_OUTPUT_DESC : UI_MENU_OUTPUT_RES_DESC);
 }
 
