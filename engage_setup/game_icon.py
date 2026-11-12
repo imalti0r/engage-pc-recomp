@@ -1,10 +1,27 @@
-"""Convert the player's extracted control icon locally; no game image is bundled."""
+"""Prepare the game's window icon: the project's own icon when the build ships one, else the player's extracted
+control icon converted locally. No game image is bundled."""
 import os
 from pathlib import Path
 import tempfile
 
 
+def project_icon():
+    """The icon this build ships (engage_setup/art/engage-icon.ico), or None in a source checkout without it."""
+    candidate = Path(__file__).resolve().parent / 'art' / 'engage-icon.ico'
+    return candidate if candidate.is_file() else None
+
+
 def prepare_icon(source, destination):
+    bundled = project_icon()
+    if bundled is not None:
+        destination = Path(destination)
+        try:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with bundled.open('rb') as src, destination.open('wb') as dst:
+                dst.write(src.read())
+            return True
+        except OSError:
+            return False  # Cosmetic metadata must not prevent a playable installation.
     source, destination = Path(source), Path(destination)
     if not source.is_file():
         return False

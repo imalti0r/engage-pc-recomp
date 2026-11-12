@@ -48,7 +48,12 @@ def tcltk_files():
 
 
 def setup_icon(path):
-    """An original E monogram in a blue tile; contains no game artwork."""
+    """The project icon (engage_setup/art/engage-icon.ico) when present; otherwise an original E monogram in a blue tile,
+    which contains no game artwork."""
+    source = ROOT / 'engage_setup' / 'art' / 'engage-icon.ico'
+    if source.is_file():
+        shutil.copy2(source, path)
+        return
     size = 32
     pixels = bytearray()
     for y in reversed(range(size)):

@@ -117,16 +117,20 @@ class LauncherGuiTest(unittest.TestCase):
         self.assertEqual(self.app.current_page, 'play')
         self.assertEqual(self.app.play_button['text'], 'Play Engage')
 
-    def test_extracted_icon_stays_local_and_is_used_by_launcher(self):
+    def test_bundled_icon_is_used_for_the_launcher_and_game_window(self):
         from PIL import Image
-        from engage_setup.game_icon import prepare_icon
+        from engage_setup.game_icon import prepare_icon, project_icon
         self.root.attributes('-alpha', 0)
         self.root.deiconify()
         self.root.update()
+        bundled = project_icon()
+        self.assertIsNotNone(bundled, 'the build ships engage_setup/art/engage-icon.ico')
         source = self.dest / 'icon.jpg'
         Image.new('RGB', (256, 256), '#3060a0').save(source)
         icon = self.dest / 'engage.ico'
         self.assertTrue(prepare_icon(source, icon))
+        # the shipped icon, not a conversion of the player's extracted icon.jpg
+        self.assertEqual(icon.read_bytes(), bundled.read_bytes())
         self.assertEqual(icon.read_bytes()[:4], b'\x00\x00\x01\x00')
         with patch.object(self.root, 'iconbitmap', wraps=self.root.iconbitmap) as set_icon:
             self.app.refresh_icon()
@@ -136,9 +140,10 @@ class LauncherGuiTest(unittest.TestCase):
         with Image.open(icon) as image:
             self.assertEqual(image.format, 'ICO')
             self.assertEqual(image.size, (256, 256))
+        # a broken or missing extracted icon still leaves the shipped one in place
         before = icon.read_bytes()
         source.write_bytes(b'not an image')
-        self.assertFalse(prepare_icon(source, icon))
+        self.assertTrue(prepare_icon(source, icon))
         self.assertEqual(icon.read_bytes(), before)
 
     def test_running_game_blocks_changes_and_launcher_remains_open(self):
