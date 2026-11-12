@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from PIL import Image, ImageOps, ImageTk
+from . import launcher as ops
 from .launcher_controls import Button
 from .launcher_typography import UI_FONT
 
@@ -99,7 +100,11 @@ class Home(ttk.Frame):
         self.open_saves.configure(state='normal' if ready else 'disabled')
 
     def set_summary(self, values, mods):
-        self.display.set(f"{values.get('output_res', '1920x1080').replace('x', ' × ')}   ·   {values.get('fps_limit', '60')} FPS")
+        # Engage: the window size is the game resolution; DLSS or FSR then produces that picture
+        upscaler = {'dlss': 'DLSS ' + ops.SETTINGS['dlss_mode'][3].get(values.get('dlss_mode', 'dlaa'), 'DLAA'),
+                    'bilinear': 'Bilinear'}.get(values.get('upscaler', 'fsr'), 'FSR')
+        self.display.set(f"{values.get('window_size', '1920x1080').replace('x', ' × ')}   ·   "
+                         f"{upscaler}   ·   {values.get('fps_limit', '60')} FPS")
         enabled = [m for m in mods if m.enabled and not m.problem]
         self.mod_count.set(f'{len(enabled)} enabled')
         self.mod_name.set(enabled[0].name if len(enabled) == 1 else 'Ready for the next launch' if enabled else 'No mods enabled')

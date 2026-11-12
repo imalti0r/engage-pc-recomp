@@ -13,17 +13,38 @@ import zipfile
 TITLE = '0100A6301214E000'
 WRAPPERS = ('', TITLE + '/', 'contents/' + TITLE + '/', 'atmosphere/contents/' + TITLE + '/')
 SETTINGS = {
+    # The order follows the in-game F1 tabs, Screen first (runtime/ui/menu.cpp tab_screen), then Game and Sound, so a
+    # player finds a setting where they last saw it.
     'fullscreen': ('display', 'Window mode', '0', {'0': 'Windowed', '1': 'Fullscreen'}),
+    # Engage: the window size IS the game resolution (runtime/resolution.c engage_apply), so there is no separate
+    # game-resolution setting here: the in-game Screen tab has no such row either.
     'window_size': ('display', 'Window size', '1920x1080', {v: v for v in ('1280x720', '1600x900', '1920x1080', '2560x1440', '3200x1800', '3840x2160')}),
-    'output_res': ('display', 'Game resolution', '1920x1080',
-                   {v: v for v in ('1280x720', '1600x900', '1920x1080', '2560x1440', '3200x1800', '3840x2160')}),
-    'render_scale': ('display', '3D render scale', 'game', {'game': 'Game default', **{str(v): str(v) + '%' for v in (50, 75, 100, 150)}}),
-    'fps_limit': ('frame rate', 'Frame rate limit', '60', {'30': '30 FPS', '60': '60 FPS'}),
     'vk_present': ('display', 'Presentation', 'fifo', {'fifo': 'VSync', 'mailbox': 'Mailbox', 'immediate': 'Immediate'}),
-    'volume': ('audio', 'Volume', '100', {str(v): str(v) + '%' for v in range(0, 101, 10)}),
+    'perf_overlay': ('display', 'Performance overlay', 'off', {'off': 'Off', 'fps': 'FPS only', 'full': 'Full'}),
+    'render_scale': ('display', '3D render scale', 'game', {'game': 'Game default', **{str(v): str(v) + '%' for v in (50, 75, 100, 150)}}),
+    'upscaler': ('display', 'Scaling to the window', 'fsr', {'fsr': 'AMD FSR 1', 'bilinear': 'Bilinear', 'dlss': 'NVIDIA DLSS'}),
+    'dlss_mode': ('display', 'DLSS mode', 'dlaa',
+                  {'dlaa': 'DLAA', 'quality': 'Quality', 'balanced': 'Balanced', 'performance': 'Performance',
+                   'ultra': 'Ultra performance'}),
+    'sharpness': ('display', 'FSR sharpness', '80', {str(v): str(v) + '%' for v in range(0, 101, 5)}),
+    'aspect': ('display', 'Picture shape', 'fit', {'fit': 'Black bars', 'stretch': 'Stretch'}),
+    'fps_limit': ('frame rate', 'Frame rate limit', '60', {'30': '30 FPS', '60': '60 FPS'}),
     'lang': ('language', 'Game language', 'en-US', {'en-US': 'English', 'ja': 'Japanese', 'fr': 'French', 'de': 'German', 'it': 'Italian', 'es': 'Spanish', 'ko': 'Korean', 'zh-Hans': 'Chinese (simplified)', 'zh-Hant': 'Chinese (traditional)'}),
+    'volume': ('audio', 'Volume', '100', {str(v): str(v) + '%' for v in range(0, 101, 10)}),
+}
+# Rows that only exist for one upscaler, as the in-game Screen tab shows them: a DLSS mode for an upscaler that does
+# not run is noise, and FSR's sharpness means nothing while DLSS produces the picture.
+SETTINGS_NEEDS = {
+    'dlss_mode': ('upscaler', ('dlss',)),
+    'sharpness': ('upscaler', ('fsr', 'bilinear')),
 }
 LINE = re.compile(r'^\s*(?:totk_)?([a-z0-9_]+)\s*=\s*(.*?)\s*$', re.I)
+
+
+def row_visible(key, values):
+    """Whether a settings row belongs on the page for the current values (SETTINGS_NEEDS)."""
+    need = SETTINGS_NEEDS.get(key)
+    return not need or values.get(need[0]) in need[1]
 
 
 def version_label(version, channel):

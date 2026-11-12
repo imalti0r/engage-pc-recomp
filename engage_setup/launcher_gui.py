@@ -178,19 +178,22 @@ class Launcher:
     def build_settings(self):
         page = self.pages['settings']
         self.heading(page, 'Settings', 'Changes apply on next launch. F1 offers more settings in-game.')
-        fields = ttk.Frame(page)
-        fields.pack(fill='x')
-        fields.columnconfigure((0, 1), weight=1, uniform='settings')
-        self.setting_widgets = []
-        for row, (key, (_, label, _, choices)) in enumerate(ops.SETTINGS.items()):
-            field = ttk.Frame(fields)
-            field.grid(row=row // 2, column=row % 2, sticky='ew', padx=(0, 24) if row % 2 == 0 else 0, pady=(0, 10))
+        self.fields = ttk.Frame(page)
+        self.fields.pack(fill='x')
+        # three columns: eleven rows two-up would push the install controls off the window
+        self.fields.columnconfigure((0, 1, 2), weight=1, uniform='settings')
+        self.setting_widgets, self.setting_rows = [], {}
+        for key, (_, label, _, choices) in ops.SETTINGS.items():
+            field = ttk.Frame(self.fields)
             ttk.Label(field, text=label).pack(anchor='w', pady=(0, 5))
             var = tk.StringVar()
             self.setting_vars[key] = var
             widget = ttk.Combobox(field, textvariable=var, values=list(choices.values()), state='readonly', width=28)
             widget.pack(fill='x')
+            self.setting_rows[key] = field
             self.setting_widgets.append(widget)
+        # a row appears and disappears with the upscaler, so the grid is laid out again whenever that changes
+        self.setting_vars['upscaler'].trace_add('write', lambda *_: self.layout_settings(self.current_settings()))
         self.save_settings_button = ttk.Button(page, text='Save settings', command=self.save_settings)
         self.save_settings_button.pack(anchor='w', pady=(18, 0))
         install = ttk.Frame(page)
@@ -202,6 +205,23 @@ class Launcher:
         self.check_updates_button = ttk.Button(install, text='Check for updates', command=lambda: self.check_updates(True))
         self.check_updates_button.pack(side='left')
         ttk.Label(page, textvariable=self.location, style='Muted.TLabel', wraplength=880).pack(anchor='w', pady=(10, 0))
+
+    def current_settings(self):
+        """The page's values under their setting keys (the comboboxes show labels, the ini stores values)."""
+        values = {}
+        for key, var in self.setting_vars.items():
+            choices = ops.SETTINGS[key][3]
+            values[key] = next((v for v, label in choices.items() if label == var.get()), var.get())
+        return values
+
+    def layout_settings(self, values):
+        """Place the rows that apply for these values, two per line (SETTINGS_NEEDS)."""
+        shown = [key for key in ops.SETTINGS if ops.row_visible(key, values)]
+        for key in ops.SETTINGS:
+            self.setting_rows[key].grid_forget()
+        for row, key in enumerate(shown):
+            self.setting_rows[key].grid(row=row // 3, column=row % 3, sticky='ew',
+                                        padx=(0, 24) if row % 3 < 2 else 0, pady=(0, 10))
 
     def build_mods(self):
         page = self.pages['mods']
@@ -326,6 +346,7 @@ class Launcher:
                 label = choices.get(value, value)
                 self.setting_vars[key].set(label)
                 self.setting_widgets[list(ops.SETTINGS).index(key)].configure(values=list(choices.values()) + ([] if value in choices else [value]))
+            self.layout_settings(self.settings_loaded)
             selection = self.mods.selection()
             selected_name = self.mod_rows[selection[0]].name if selection and selection[0] in self.mod_rows else None
             self.mod_rows = {}
@@ -509,9 +530,7 @@ class Launcher:
     def save_settings(self):
         def save():
             changes = {}
-            for key, var in self.setting_vars.items():
-                choices = ops.SETTINGS[key][3]
-                value = next((v for v, label in choices.items() if label == var.get()), var.get())
+            for key, value in self.current_settings().items():
                 if value != self.settings_loaded[key]:
                     changes[key] = value
             ops.write_settings(self.dest, changes)

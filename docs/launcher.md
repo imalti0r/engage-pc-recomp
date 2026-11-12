@@ -73,7 +73,13 @@ bundle or public executable. The executable file's own Explorer icon stays gener
 
 The settings page writes only the values you change to `engage.ini`, preserving
 other settings and comments. Environment variables still override the file.
-More controls remain available with F1 in-game.
+Its rows are the in-game Screen tab's: window mode and size (on Engage the window
+size is the game resolution), presentation, the performance overlay, the 3D scale,
+the upscaler, its DLSS mode or FSR sharpness, the picture shape and the frame
+limit, plus the game language and the volume from the other tabs. The DLSS mode
+appears only while DLSS is the upscaler, and FSR sharpness only while FSR or
+bilinear is, exactly as the in-game tab shows them. More controls remain
+available with F1 in-game.
 
 Save loading happens in the game's title menu. **Open folder** opens
 `profile/save`; **Back up** makes a ZIP in `save-backups`, including committed
