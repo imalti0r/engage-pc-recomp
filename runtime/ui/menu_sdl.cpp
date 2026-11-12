@@ -58,6 +58,10 @@ extern "C" void menu_sdl_event(const SDL_Event *e) {
         if (!menu_is_open()) return;
         if (ImGuiKey k = key_of(e->key.scancode)) menu_event_key(k, e->type == SDL_EVENT_KEY_DOWN);
         return;
+    case SDL_EVENT_TEXT_INPUT:
+        // typed characters, for the numeric rows (the menu's edit field)
+        if (menu_is_open()) menu_event_char_text(e->text.text);
+        return;
     case SDL_EVENT_MOUSE_MOTION:
         if (menu_is_open()) menu_event_mouse_pos(e->motion.x * d, e->motion.y * d);
         return;

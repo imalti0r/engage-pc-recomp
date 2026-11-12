@@ -106,7 +106,7 @@ extern "C" void menu_toggle(void) {
 }
 
 // ---- events from the window adapter, queued while the menu is open; the present path hands them to ImGui
-enum { EV_KEY, EV_POS, EV_BUTTON, EV_WHEEL, EV_FOCUS, EV_MAX = 256 };
+enum { EV_KEY, EV_POS, EV_BUTTON, EV_WHEEL, EV_FOCUS, EV_CHAR, EV_MAX = 256 };
 struct Ev { int type, a, b; float x, y; };
 static PlatMutex ev_lock = PLAT_MUTEX_INIT;
 static Ev ev_q[EV_MAX];
@@ -125,6 +125,13 @@ extern "C" void menu_event_mouse_pos(float x, float y) { push({EV_POS, 0, 0, x, 
 extern "C" void menu_event_mouse_button(int button, int down) { push({EV_BUTTON, button, down, 0, 0}); }
 extern "C" void menu_event_wheel(float dx, float dy) { push({EV_WHEEL, 0, 0, dx, dy}); }
 extern "C" void menu_event_focus(int focused) { push({EV_FOCUS, focused, 0, 0, 0}); }
+// A typed character (digits for the numeric rows): ImGui turns it into text for the field that has the keyboard.
+extern "C" void menu_event_char(unsigned ch) { push({EV_CHAR, (int)ch, 0, 0, 0}); }
+// A typed string (SDL delivers text input as UTF-8); each ASCII character becomes one event.
+extern "C" void menu_event_char_text(const char *s) {
+    for (; s && *s; s++)
+        if ((unsigned char)*s >= 32 && (unsigned char)*s < 127) menu_event_char((unsigned char)*s);
+}
 
 static void drain_events(ImGuiIO &io) {
     Ev q[EV_MAX];
@@ -141,6 +148,7 @@ static void drain_events(ImGuiIO &io) {
         case EV_BUTTON: io.AddMouseButtonEvent(e.a, e.b != 0); break;
         case EV_WHEEL: io.AddMouseWheelEvent(e.x, e.y); break;
         case EV_FOCUS: io.AddFocusEvent(e.a != 0); break;
+        case EV_CHAR: io.AddInputCharacter((unsigned)e.a); break;
         }
     }
 }
@@ -408,7 +416,7 @@ extern "C" void menu_vk_release(void) {
 // optional) at that presented frame; changes live settings with no input, menu open or not. totk.ini is written only by
 // the pseudo-key SAVE=1 (cfg_save, as a row change does; a failed write shows the menu's save note).
 enum { TAB_SCREEN, TAB_GAME, TAB_SOUND, TAB_CONTROLS, TAB_MENU, TAB_ADVANCED, TAB_MODS, TAB_COUNT };
-enum { TEST_PAGE_FRAMES = 30, TEST_SETS = 16 };
+enum { TEST_PAGE_FRAMES = 30, TEST_SETS = 256 };
 struct TestSet { uint64_t frame; char key[64], value[64]; };
 static struct {
     int parsed;
@@ -514,7 +522,10 @@ static void row_window_size(void) {
         pv[i] = vals[i];
         pn[i] = shown[i];
     }
-    opt_choice_list("TOTK_WINDOW_SIZE", UI_MENU_WINDOW_SIZE, pv, pn, n, UI_MENU_WINDOW_SIZE_DESC);
+    // Engage cannot rebuild its display buffers while it runs (Unity allocates the window textures once, at start), so
+    // the row says the change takes effect on the next start. TotK resizes its window live.
+    opt_choice_list("TOTK_WINDOW_SIZE", UI_MENU_WINDOW_SIZE, pv, pn, n, UI_MENU_WINDOW_SIZE_DESC, -1,
+                    rt_game_id == 1 ? menu_text(UI_MENU_AFTER_RESTART) : nullptr);
 }
 
 // The game resolution (resolution.c): 16:9 sizes from its smallest, 1280x720 (for weak GPUs), up, the common 21:9 and
@@ -541,20 +552,28 @@ static void row_output_res(void) {
 }
 
 static void row_render_scale(void) {
-    static const char *const totk[] = {"game", "50", "67", "75", "100", "125", "150", "200"};
-    static const char *const engage[] = {"game", "50", "75", "100", "150"};
-    const char *const *vals = rt_game_id == 1 ? engage : totk;
-    enum { N = sizeof totk / sizeof *totk };
-    int count = rt_game_id == 1 ? sizeof engage / sizeof *engage : N;
+    // With DLSS on, the mode decides the render ratio: the scene must be drawn at exactly DLSS's size, so the scale is
+    // pinned at 100 % and the row only says so (resolution.c engage_apply enforces the same thing).
+    if (rt_game_id == 1 && !strcmp(cfg_value("TOTK_UPSCALER"), "dlss")) {
+        opt_text(UI_MENU_ENGAGE_SCALE_DLSS);
+        return;
+    }
+    // Engage: a free percentage the player types, 25..200 (resolution.c clamps and rounds), or "game".
+    if (rt_game_id == 1) {
+        opt_number("TOTK_RENDER_SCALE", UI_MENU_RENDER_SCALE, UI_MENU_ENGAGE_SCALE_DESC, UI_MENU_ENGAGE_SCALE_GAME,
+                   25, 200, "%d %%");
+        return;
+    }
+    static const char *const vals[] = {"game", "50", "67", "75", "100", "125", "150", "200"};
+    enum { N = sizeof vals / sizeof *vals };
     char shown[N][32];
     const char *names[N];
-    names[0] = menu_text(rt_game_id == 1 ? UI_MENU_ENGAGE_SCALE_GAME : UI_MENU_RENDER_SCALE_GAME);
-    for (int i = 1; i < count; i++) {
+    names[0] = menu_text(UI_MENU_RENDER_SCALE_GAME);
+    for (int i = 1; i < N; i++) {
         snprintf(shown[i], sizeof shown[i], "%s %%", vals[i]);
         names[i] = shown[i];
     }
-    opt_choice_list("TOTK_RENDER_SCALE", UI_MENU_RENDER_SCALE, vals, names, count,
-                    rt_game_id == 1 ? UI_MENU_ENGAGE_SCALE_DESC : UI_MENU_RENDER_SCALE_DESC);
+    opt_choice_list("TOTK_RENDER_SCALE", UI_MENU_RENDER_SCALE, vals, names, N, UI_MENU_RENDER_SCALE_DESC);
 }
 
 static void row_gpu(void) {
@@ -687,7 +706,13 @@ static void tab_screen(float scale) {
     if (rt_game_id != 1) row_output_res();
     row_render_scale();
     static const UiTextId up[] = {UI_MENU_UPSCALER_FSR, UI_MENU_UPSCALER_BILINEAR, UI_MENU_UPSCALER_DLSS};
-    opt_choice("TOTK_UPSCALER", UI_MENU_UPSCALER, up, rt_game_id == 1 ? 3 : 2, UI_MENU_UPSCALER_DESC);
+    if (opt_choice("TOTK_UPSCALER", UI_MENU_UPSCALER, up, rt_game_id == 1 ? 3 : 2, UI_MENU_UPSCALER_DESC) &&
+        rt_game_id == 1) {
+        // DLSS divides the game resolution by its mode to get the size it renders, so a second shrink from the 3D
+        // render scale would compound with it (a 1080p picture at Performance and 50 % would draw 480p). Picking DLSS
+        // puts the scale back at 100 % and the scale row stops taking input while DLSS is on.
+        cfg_set("TOTK_RENDER_SCALE", "100");
+    }
     // The DLSS rows exist only while DLSS is the upscaler: a mode for an upscaler that does not run is noise.
     if (rt_game_id == 1 && !strcmp(cfg_value("TOTK_UPSCALER"), "dlss")) {
         static const UiTextId dmode[] = {UI_MENU_DLSS_DLAA, UI_MENU_DLSS_QUALITY, UI_MENU_DLSS_BALANCED,
@@ -1047,7 +1072,7 @@ static void layout_menu(uint32_t w, uint32_t h, float scale) {
     if (ImGui::Button(cont, ImVec2(bw, 0))) set_open(0);
     ImGui::SameLine();
     if (ImGui::Button(quit, ImVec2(bw, 0))) gfx_window_request_close();
-    bool was_modal = g_modal || binds_modal();
+    bool was_modal = g_modal || binds_modal() || opt_number_editing();
     if (g_tab != TAB_ADVANCED) g_modal = false;
     if (!was_modal && (ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false)))
         set_open(0);

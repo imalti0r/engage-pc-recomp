@@ -51,6 +51,11 @@ bool opt_button(const char *id, UiTextId label, UiTextId desc, const char *value
 bool opt_slider(const char *key, UiTextId label, float lo, float hi, UiTextId desc, float step = 1,
                 const char *fmt = "%g");
 
+// A numeric row: left / right step the value, A / click opens a field to type it (Enter accepts, Esc cancels), clamped
+// to [lo, hi]. auto_name makes "game" (the game's own choice) a legal value the row shows instead of a number.
+bool opt_number(const char *key, UiTextId label, UiTextId desc, UiTextId auto_name, int lo, int hi, const char *fmt);
+bool opt_number_editing(void);   // a field is open: the menu must leave Enter and Esc to it
+
 // Binding rows (remapping on the Controls tab): a label and three cells, each selectable on its own (left / right move between them).
 // opt_bind_header: the column titles above them. opt_bind_row: key is the setting's name without TOTK_ (BIND_A; the
 // description names it when the environment sets it); a disabled cell shows its text greyed and takes no cursor; note

@@ -37,6 +37,7 @@
 #include "cfg.h"
 #include "gfx.h"
 #include "host.h"
+#include "ov.h"
 // runtime/ui/menu.cpp: the monitor the window is on, for capping the game resolution (0 when unknown)
 int gfx_window_monitor_size(int *w, int *h);
 
@@ -226,9 +227,11 @@ void res_heapdef_served(void) { R.heapdef_ok = 1; }
 static uint64_t pack(unsigned w, unsigned h) { return (uint64_t)h << 32 | w; }
 
 // Which window/upscaler settings the live path has already applied. Each change writes the new sizes into the patch
-// page and calls res_engage_live, which re-asks the game for its buffers (see below).
+// page and calls res_engage_live, which re-asks the game for its buffers (see below). On Engage the window size IS the
+// game resolution, so it is tracked too: without it a size change never reached engage_apply and the game kept drawing
+// the resolution it started with.
 static unsigned g_live_seen;
-static char g_live_up[8], g_live_mode[16], g_live_res[24], g_live_scale[8];
+static char g_live_up[8], g_live_mode[16], g_live_res[24], g_live_scale[8], g_live_window[24];
 
 // The DLSS mode's upscale ratio (see vk_dlss.cpp mode_of): the game draws at 1/ratio of the target resolution and
 // DLSS brings it up. DLAA (and FSR, which scales on the present) keeps the target size.
@@ -305,13 +308,27 @@ static void engage_apply(const char *why) {
     }
     float scale = 1;
     int fixed = strcmp(s, "game") != 0;
-    if (fixed) {
+    // DLSS already divides the game resolution by its mode's ratio to decide what the game draws. A second shrink from
+    // the 3D render scale would compound with it (1080p at Performance and 50 % would draw 480p), and the game's own
+    // per-scene scale would break the exact ratio DLSS requires. So with DLSS the scene is drawn at exactly the size
+    // DLSS computes: scale 1.0, the scene patch on, whatever the setting says.
+    const int dlss = RT_ENGAGE && !strcmp(cfg_value("TOTK_UPSCALER"), "dlss");
+    if (dlss) {
+        fixed = 1;
+        scale = 1.0f;
+    } else if (fixed) {
+        // Any percentage the player types, 25..200 (the menu's field allows the same range): clamped to the limits and
+        // rounded to a whole percent. Below 25 the scene would be too coarse to see; above 200 the texture heap and the
+        // GPU time grow far faster than the picture improves.
         char *end;
         double pct = strtod(s, &end);
-        if (end != s && !*end && pct >= 50 && pct <= 150) scale = (float)(pct / 100);
-        else {
+        if (end != s && !*end && isfinite(pct) && pct > 0) {
+            if (pct < 25) pct = 25;
+            if (pct > 200) pct = 200;
+            scale = (float)(lround(pct) / 100.0);
+        } else {
             fixed = 0;
-            rt_log("resolution: Engage render scale %s is outside 50..150; using game", s);
+            rt_log("resolution: Engage render scale %s is not a percentage; using game", s);
         }
     }
     int output = rt_patch_set("engage_output"), scene = rt_patch_set("engage_scene");
@@ -323,12 +340,18 @@ static void engage_apply(const char *why) {
     memcpy(page + 64, &w, 4);
     memcpy(page + 68, &h, 4);
     memcpy(page + 72, &scale, 4);
-    rt_patch_switch(output, w != BASE_W || h != BASE_H);
+    // engage_output stays on even at the game's own size: its sites feed a store Unity makes while it sets up its
+    // display, so a size switched off here would leave the last written value in Unity's ScreenManager fields. Turning
+    // it off at 1280x720 left the game drawing 720p after a return to a larger size.
+    rt_patch_switch(output, 1);
+    // engage_scene replaces a load, so switching it off reads the asset's own renderScale: no stale value, and "game"
+    // keeps meaning "whatever the game chose".
     rt_patch_switch(scene, fixed);
     // what the overlay reports (res_sizes): the size drawn and the 3D scene inside it
     E_draw[0] = w, E_draw[1] = h;
     E_scene[0] = (unsigned)(w * scale + 0.5f), E_scene[1] = (unsigned)(h * scale + 0.5f);
-    rt_log("resolution: Engage output %ux%u, 3D scale %s%s (%s)", w, h, s, fixed ? "%" : " (game controlled)", why);
+    rt_log("resolution: Engage output %ux%u, 3D scale %s%s (%s)", w, h,
+           dlss ? "100" : s, dlss ? "% (DLSS sets the ratio)" : fixed ? "%" : " (game controlled)", why);
 }
 
 static void engage_init(void) {
@@ -338,6 +361,7 @@ static void engage_init(void) {
     snprintf(g_live_up, sizeof g_live_up, "%s", cfg_value("TOTK_UPSCALER"));
     snprintf(g_live_mode, sizeof g_live_mode, "%s", cfg_value("TOTK_DLSS_MODE"));
     snprintf(g_live_scale, sizeof g_live_scale, "%s", cfg_value("TOTK_RENDER_SCALE"));
+    snprintf(g_live_window, sizeof g_live_window, "%s", cfg_value("TOTK_WINDOW_SIZE"));
     g_live_seen = 1;
 }
 
@@ -433,13 +457,17 @@ void res_engage_live(void) {
     if (!RT_ENGAGE) return;
     const char *res = cfg_value("TOTK_OUTPUT_RES"), *up = cfg_value("TOTK_UPSCALER");
     const char *mode = cfg_value("TOTK_DLSS_MODE"), *scale = cfg_value("TOTK_RENDER_SCALE");
+    // TOTK_WINDOW_SIZE is part of the comparison: on Engage the window size is the game resolution (engage_apply), so
+    // a window change that did not reach engage_apply left the game drawing the size it started with.
+    const char *win = cfg_value("TOTK_WINDOW_SIZE");
     if (g_live_seen && !strcmp(res, g_live_res) && !strcmp(up, g_live_up) && !strcmp(mode, g_live_mode) &&
-        !strcmp(scale, g_live_scale))
+        !strcmp(scale, g_live_scale) && !strcmp(win, g_live_window))
         return;
     snprintf(g_live_res, sizeof g_live_res, "%s", res);
     snprintf(g_live_up, sizeof g_live_up, "%s", up);
     snprintf(g_live_mode, sizeof g_live_mode, "%s", mode);
     snprintf(g_live_scale, sizeof g_live_scale, "%s", scale);
+    snprintf(g_live_window, sizeof g_live_window, "%s", win);
     int first = !g_live_seen;
     g_live_seen = 1;
     engage_apply(first ? "start" : "settings changed");
@@ -447,6 +475,10 @@ void res_engage_live(void) {
     // and back), which is how a resolution change happens on the real hardware. Push that notification after a live
     // change so the new size in the patch page is picked up without a restart; the mode itself stays as configured.
     if (!first) {
+        // The game decides to rebuild its display when the *reported* console mode changes, not when a notification
+        // arrives: Unity reads nn::oe::GetOperationMode and compares it with what it saw last. So flip the reported
+        // mode for a second around the notifications.
+        ov_operation_mode_flip();
         oe_push_message(OE_MSG_OPERATION_MODE_CHANGED);
         oe_push_message(OE_MSG_PERFORMANCE_MODE_CHANGED);
         rt_log("resolution: pushed the operation-mode change so the game rebuilds its buffers");

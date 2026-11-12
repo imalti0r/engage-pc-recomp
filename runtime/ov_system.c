@@ -38,6 +38,8 @@ static const char *caller(Cpu *c, char *buf, int n) { return ldr_describe(c->x[3
 
 // ==== nn::oe (services.c)
 // TOTK_OPERATION_MODE, read once: 1 handheld (OperationMode 0, PerformanceMode Normal 0), 0 docked (1, Boost 1).
+// The reported value can be flipped for a moment at run time (ov_operation_mode_flip): the game only rebuilds its
+// display buffers when it sees a *changed* operation mode, so a live resolution change has to flip this value.
 int ov_handheld(void) {
     static volatile int32_t v = -1;
     int32_t h = v;
@@ -52,6 +54,33 @@ int ov_handheld(void) {
     }
     return (int)h;
 }
+
+// Flip the operation mode the game sees for a moment. Unity's screen manager treats a dock/undock as its cue to
+// re-read the display and rebuild its buffers, so a live resolution change has to produce one. The flip is transient:
+// it ends after a second, and the end is a second change, which is what makes the game rebuild again at the size the
+// patch page asks for (a handheld rebuild caps the display at 720p, the docked one takes the configured size).
+static volatile int32_t g_op_flip_pending;   // a flip is running: the second notification is still due
+static volatile int32_t g_op_flip_frames;    // presents the flip still lasts (counted by gfx_present.c)
+void ov_operation_mode_flip(void) {
+    plat_xchg32(&g_op_flip_pending, 1);
+    plat_xchg32(&g_op_flip_frames, 40);   // ~0.7 s: long enough for the game to read the flipped mode at least once
+    rt_log("oe: reporting the other console mode so the game rebuilds its display buffers");
+}
+
+// One present went by: the flip ends after a few frames, and the end is the second console-mode change (the one that
+// rebuilds at the configured size, uncapped by the handheld ceiling the flipped mode imposes).
+int ov_operation_mode_flip_ended(void) {
+    if (!g_op_flip_pending) return 0;
+    int32_t f = g_op_flip_frames;
+    if (f > 0) {
+        plat_xchg32(&g_op_flip_frames, f - 1);
+        return 0;
+    }
+    return plat_xchg32(&g_op_flip_pending, 0) == 1;
+}
+
+// Whether the reported mode is flipped right now (the getters read it).
+int ov_op_flipped(void) { return g_op_flip_pending && g_op_flip_frames > 0; }
 
 // The Switch language for a BCP 47 tag; en-US for a language the game does not ship.
 static const char *switch_language(const char *tag) {
@@ -134,8 +163,14 @@ static void ov_cpu_boost(Cpu *c) {
     if (mode < 0 || mode > 2) rt_fatal("nn::oe::SetCpuBoostMode: unknown mode %lld", (long long)mode);
 }
 
-static void ov_operation_mode(Cpu *c) { ret_x(c, ov_handheld() ? 0 : 1); }
-static void ov_performance_mode(Cpu *c) { ret_x(c, ov_handheld() ? 0 : 1); }
+static void ov_operation_mode(Cpu *c) {
+    uint64_t v = ov_handheld() ^ ov_op_flipped() ? 0 : 1;
+    static volatile int32_t last = -1;
+    if (plat_xchg32(&last, (int32_t)v) != (int32_t)v)
+        rt_log("oe: GetOperationMode -> %llu (flipped=%d)", (unsigned long long)v, ov_op_flipped());
+    ret_x(c, v);
+}
+static void ov_performance_mode(Cpu *c) { ret_x(c, ov_handheld() ^ ov_op_flipped() ? 0 : 1); }
 
 // void SetFocusHandlingMode(FocusHandlingMode mode): the nnMain checkpoint of --boot
 static volatile int32_t focus_mode;
@@ -186,6 +221,7 @@ void oe_push_message(uint32_t message) {
     if (tail - head < 32) {
         messages[tail++ % 32] = message;
         plat_cond_broadcast(&message_cv);
+        rt_log("oe: pushed notification message %u", message);
     }
     plat_mutex_unlock(&lock);
 }
@@ -264,6 +300,7 @@ static void ov_try_pop(Cpu *c) {
     if (ok) {
         uint32_t m = messages[head++ % 32];
         if (out) *out = m;
+        rt_log("oe: TryPopNotificationMessage -> %u", m);
     }
     plat_mutex_unlock(&lock);
     ret_x(c, (uint64_t)ok);
@@ -277,6 +314,7 @@ static void ov_pop(Cpu *c) {
     uint32_t m = messages[head++ % 32];
     plat_mutex_unlock(&lock);
     kern_core_back(&away);
+    rt_log("oe: PopNotificationMessage -> %u", m);
     ret_x(c, m);
 }
 

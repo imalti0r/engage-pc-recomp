@@ -188,8 +188,18 @@ class Launcher:
             ttk.Label(field, text=label).pack(anchor='w', pady=(0, 5))
             var = tk.StringVar()
             self.setting_vars[key] = var
-            widget = ttk.Combobox(field, textvariable=var, values=list(choices.values()), state='readonly', width=28)
-            widget.pack(fill='x')
+            if choices is None:
+                # free text (the 3D render scale): "Game default" or a percentage the game accepts
+                widget = ttk.Entry(field, textvariable=var, width=28)
+                widget.pack(fill='x')
+                hint = ttk.Label(field, text=f'Game default, or {ops.RENDER_SCALE_MIN}–{ops.RENDER_SCALE_MAX} %',
+                                 style='Muted.TLabel')
+                hint.pack(anchor='w', pady=(4, 0))
+                if key == 'render_scale':
+                    var.trace_add('write', lambda *_, v=var: self.render_scale_typed(v))
+            else:
+                widget = ttk.Combobox(field, textvariable=var, values=list(choices.values()), state='readonly', width=28)
+                widget.pack(fill='x')
             self.setting_rows[key] = field
             self.setting_widgets.append(widget)
         # a row appears and disappears with the upscaler, so the grid is laid out again whenever that changes
@@ -211,8 +221,20 @@ class Launcher:
         values = {}
         for key, var in self.setting_vars.items():
             choices = ops.SETTINGS[key][3]
+            if choices is None:   # a free-text row: what the player typed, in ini form
+                values[key] = ops.render_scale_value(var.get()) if key == 'render_scale' else var.get().strip()
+                continue
             values[key] = next((v for v, label in choices.items() if label == var.get()), var.get())
         return values
+
+    def render_scale_typed(self, var):
+        """Colour the 3D render scale field when what was typed is not a value the game accepts."""
+        value = ops.render_scale_value(var.get())
+        state = 'Invalid' if value is None else ''
+        if getattr(self, 'render_scale_state', None) != state:
+            self.render_scale_state = state
+            self.status.set(f'3D render scale must be Game default or {ops.RENDER_SCALE_MIN}–{ops.RENDER_SCALE_MAX} %.'
+                            if state == 'Invalid' else '')
 
     def layout_settings(self, values):
         """Place the rows that apply for these values, two per line (SETTINGS_NEEDS)."""
@@ -343,8 +365,10 @@ class Launcher:
             for key, (_, _, default, choices) in ops.SETTINGS.items():
                 value = values.get(key, default)
                 self.settings_loaded[key] = value
-                label = choices.get(value, value)
-                self.setting_vars[key].set(label)
+                if choices is None:   # a free-text row (the 3D render scale)
+                    self.setting_vars[key].set(ops.render_scale_text(value))
+                    continue
+                self.setting_vars[key].set(choices.get(value, value))
                 self.setting_widgets[list(ops.SETTINGS).index(key)].configure(values=list(choices.values()) + ([] if value in choices else [value]))
             self.layout_settings(self.settings_loaded)
             selection = self.mods.selection()
@@ -529,12 +553,22 @@ class Launcher:
 
     def save_settings(self):
         def save():
+            values = self.current_settings()
+            invalid = [ops.SETTINGS[k][1] for k, v in values.items() if v is None]
+            if invalid:
+                raise ValueError(', '.join(invalid) + f' must be Game default or {ops.RENDER_SCALE_MIN}–'
+                                                      f'{ops.RENDER_SCALE_MAX} %.')
             changes = {}
-            for key, value in self.current_settings().items():
+            for key, value in values.items():
                 if value != self.settings_loaded[key]:
                     changes[key] = value
             ops.write_settings(self.dest, changes)
-            self.status.set('Settings saved for the next launch.')
+            notice = 'Settings saved for the next launch.'
+            if 'window_size' in changes:
+                # Engage allocates its window textures once, at start: a new game resolution cannot take effect while
+                # it runs (the runtime pushes the console-mode change, but Unity never re-enumerates the display).
+                notice = 'Window size saved — it applies when the game next starts.'
+            self.status.set(notice)
             self.refresh()
         self.guarded(save)
 

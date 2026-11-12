@@ -287,6 +287,75 @@ bool opt_choice_list(const char *key, UiTextId label, const char *const *values,
     return true;
 }
 
+// A numeric row the player types into. Left / right step the value; A / click opens an edit field (typing digits, Enter
+// accepts, Esc cancels) and the value is clamped to [lo, hi]. A row showing `auto_name` ("game") starts typing from lo.
+static int g_number_open;               // 1 while a field is open
+static int g_number_fresh;              // the field was opened this frame: take the keyboard focus next
+static char g_number_text_[16];
+static char g_number_key[64];
+
+bool opt_number(const char *key, UiTextId label, UiTextId desc, UiTextId auto_name, int lo, int hi, const char *fmt) {
+    const CfgMeta *m = cfg_meta(key);
+    const char *now = cfg_value(key);
+    bool auto_on = auto_name && !strcmp(now, "game");
+    if (g_number_open && !strcmp(g_number_key, key)) {
+        // the field, in the row's place: digits are typed, Enter accepts, Esc drops the edit
+        ImGui::PushID(key);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(menu_text(label));
+        float field = ImGui::GetWindowContentRegionMax().x * 0.42f;
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - field);
+        ImGui::SetNextItemWidth(field);
+        if (g_number_fresh) {
+            ImGui::SetKeyboardFocusHere();
+            g_number_fresh = 0;
+        }
+        ImGuiInputTextFlags flags = ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_EnterReturnsTrue |
+                                    ImGuiInputTextFlags_AutoSelectAll;
+        bool done = ImGui::InputText("##num", g_number_text_, sizeof g_number_text_, flags);
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+            g_number_open = 0;
+            ImGui::PopID();
+            return false;
+        }
+        if (done) {
+            int n = atoi(g_number_text_);
+            n = n < lo ? lo : n > hi ? hi : n;
+            char out[16];
+            snprintf(out, sizeof out, "%d", n);
+            g_number_open = 0;
+            ImGui::PopID();
+            apply(key, out);
+            return true;
+        }
+        ImGui::PopID();
+        return false;
+    }
+    char shown[48];
+    if (auto_on) snprintf(shown, sizeof shown, "%s", menu_text(auto_name));
+    else snprintf(shown, sizeof shown, fmt, (int)lround(cfg_double(key)));
+    RowView v = {shown, m && !strcmp(now, m->def), true, NULL};
+    int step = row(key, label, desc, v);
+    if (step == 2) {   // A / click: type a new value
+        snprintf(g_number_text_, sizeof g_number_text_, "%d", auto_on ? lo : (int)lround(cfg_double(key)));
+        snprintf(g_number_key, sizeof g_number_key, "%s", key);
+        g_number_open = 1;
+        g_number_fresh = 1;
+        return false;
+    }
+    if (!step) return false;
+    int n = auto_on ? lo : (int)lround(cfg_double(key));
+    n += step * (hi - lo > 40 ? 5 : 1);   // a wide range moves faster
+    n = n < lo ? lo : n > hi ? hi : n;
+    char out[16];
+    snprintf(out, sizeof out, "%d", n);
+    apply(key, out);
+    return true;
+}
+
+// Whether a numeric row is open (the menu must not treat Enter / Esc as its own and must not navigate).
+bool opt_number_editing(void) { return g_number_open != 0; }
+
 bool opt_choice(const char *key, UiTextId label, const UiTextId *names, int n, UiTextId desc, const char *note) {
     enum { MAX = 32 };
     const CfgMeta *m = cfg_meta(key);

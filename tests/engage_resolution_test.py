@@ -85,6 +85,9 @@ void rt_patch_switch(int set,int on) { assert(set>=0 && set<2); enabled[set]=on;
 void *rt_patch_page(void) { return page; }
 void rt_log(const char *fmt,...) {}
 void oe_push_message(unsigned message) {}
+void ov_operation_mode_flip(void) {}
+int ov_op_flipped(void) { return 0; }
+int ov_operation_mode_flip_ended(void) { return 0; }
 int gfx_window_monitor_size(int *w, int *h) { *w = 0; *h = 0; return 0; }
 void fs_init(void) { abort(); }
 int cfg_int(const char *key) { abort(); }
@@ -94,7 +97,9 @@ int main(int argc,char **argv) {
  unsigned w,h; float k;
  memcpy(&w,page+64,4); memcpy(&h,page+68,4); memcpy(&k,page+72,4);
  assert(w==(unsigned)atoi(argv[3]) && h==w*9/16);
- assert(enabled[0]==(w!=1920));
+ // engage_output stays on at every size: its sites feed a store Unity makes while it sets up its display, so a size
+ // switched off here used to leave the last written value behind (a return to a larger size kept drawing 720p).
+ assert(enabled[0]==1);
  assert(enabled[1]==atoi(argv[4]));
  assert(k==(float)atof(argv[5]));
  assert(res_heap_extra_kib()==0);
@@ -112,9 +117,13 @@ int main(int argc,char **argv) {
                      ('1920x1080', '100', 1920, 1, 1), ('2560x1440', '150', 2560, 1, 1.5),
                      ('3200x1800', '100', 3200, 1, 1), ('3840x2160', '100', 3840, 1, 1),
                      ('1920x1080', 'game', 1920, 0, 1), ('3440x1440', 'game', 2560, 0, 1),
-                     ('1280x720junk', '75', 1920, 1, .75)]
+                     ('1280x720junk', '75', 1920, 1, .75),
+                     # any typed percentage inside 25..200 now works, clamped to the limits
+                     ('1920x1080', '25', 1920, 1, .25), ('1920x1080', '133', 1920, 1, 1.33),
+                     ('1920x1080', '200', 1920, 1, 2), ('1920x1080', '10', 1920, 1, .25),
+                     ('1920x1080', '999', 1920, 1, 2)]
             cases += [('1920x1080', value, 1920, 0, 1)
-                      for value in ('nan', 'inf', '0', '49', '151', '200', 'bad', '75%')]
+                      for value in ('nan', 'inf', '0', 'bad', '75%')]
             for case in cases:
                 with self.subTest(case=case):
                     subprocess.run([str(exe), *map(str, case)], check=True, capture_output=True)

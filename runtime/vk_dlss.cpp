@@ -31,6 +31,8 @@ extern "C" {
 
 #include <csetjmp>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <cwchar>
 #include <string>
 
@@ -538,14 +540,19 @@ int vk_dlss_record(VkCommandBuffer cb, unsigned slot, VkImage src, VkFormat fmt,
     // still draws too large: frames stay valid and reach the requested mode as soon as the rebuild lands.
     unsigned rw2[2];
     res_engage_target(rw2);
+    // The cap is the resolution the settings ask the game to produce (E_target), not the present rectangle: on a 4K
+    // desktop the window comes back maximised and its client area is a little smaller than 3840x2160 (3768x2119), and
+    // capping by that demoted every 4K mode one step (Quality drew 2560x1440 but DLSS ran as DLAA). The present blit
+    // scales the picture to whatever rectangle it has, so a cap that follows the settings is the correct one.
     uint32_t capw = rw2[0] ? rw2[0] : (uint32_t)dw, caph = rw2[1] ? rw2[1] : (uint32_t)dh;
-    if (dw && capw > (uint32_t)dw) capw = (uint32_t)dw;
-    if (dh && caph > (uint32_t)dh) caph = (uint32_t)dh;
-    // largest ratio first; the requested mode's ratio is the ceiling
+    // largest ratio first; the requested mode's ratio is the ceiling. A couple of pixels of slack: the game rounds its
+    // draw size to even numbers, so `iw * ratio` can overshoot the window by one or two pixels (1280x720 balanced drew
+    // 742x418 and 742 * 1.724 = 1279 against a 1278 window), which used to demote the mode to Quality.
     static const struct { double ratio; sl::DLSSMode mode; } kLadder[] = {
         {3.0, sl::DLSSMode::eUltraPerformance}, {2.0, sl::DLSSMode::eMaxPerformance},
         {1.0 / 0.58, sl::DLSSMode::eBalanced}, {1.5, sl::DLSSMode::eMaxQuality}, {1.0, sl::DLSSMode::eDLAA},
     };
+    const uint32_t slack = 2;
     double want = 1.0;
     for (size_t i = 0; i < sizeof kLadder / sizeof *kLadder; i++)
         if (kLadder[i].mode == m) { want = kLadder[i].ratio; break; }
@@ -553,14 +560,34 @@ int vk_dlss_record(VkCommandBuffer cb, unsigned slot, VkImage src, VkFormat fmt,
     for (size_t i = 0; i < sizeof kLadder / sizeof *kLadder; i++) {
         if (kLadder[i].ratio > want + 0.01) continue;   // never sharper than the mode the player chose
         uint32_t tw = (uint32_t)(iw * kLadder[i].ratio + 0.5), th = (uint32_t)(ih * kLadder[i].ratio + 0.5);
-        if (capw && tw > capw) continue;
-        if (caph && th > caph) continue;
+        if (capw && tw > capw + slack) continue;
+        if (caph && th > caph + slack) continue;
         ratio = kLadder[i].ratio;
         m = kLadder[i].mode;
         break;
     }
     uint32_t ow = (uint32_t)(iw * ratio + 0.5) & ~1u;
     uint32_t oh = (uint32_t)(ih * ratio + 0.5) & ~1u;
+    // never larger than the picture's own rectangle: DLSS's output is presented 1:1
+    if (capw && ow > capw) ow = capw & ~1u;
+    if (caph && oh > caph) oh = caph & ~1u;
+    // what the game actually hands us, the cap the settings ask for and the swapchain's own size: the three numbers
+    // that say whether a settings change reached the game. TOTK_TRACE=1 logs when they change, 2 on every present (the
+    // matrix runner needs one line per combo, and a switch that changes nothing would leave no line at level 1).
+    static int trace = -1;
+    if (trace < 0) trace = cfg_int("TOTK_TRACE") > 0 ? cfg_int("TOTK_TRACE") : getenv("TOTK_DLSS_TRACE") != NULL;
+    if (trace > 0) {
+        static uint32_t last[6];
+        static unsigned long long presents;
+        presents++;
+        uint32_t now[6] = {iw, ih, capw, caph, (uint32_t)dw, (uint32_t)dh};
+        int changed = memcmp(now, last, sizeof now) != 0;
+        if (trace > 1 || changed) {
+            memcpy(last, now, sizeof now);
+            rt_log("vk: DLSS trace: present %llu: game draws %ux%u, settings cap %ux%u, present %ux%u -> output %ux%u",
+                   presents, iw, ih, capw, caph, (uint32_t)dw, (uint32_t)dh, ow, oh);
+        }
+    }
     if (!ensure_images(c, iw, ih, ow, oh)) return 0;
     slot %= SLOTS;
     if (D.src_view[slot]) vkDestroyImageView(c->device, D.src_view[slot], NULL);

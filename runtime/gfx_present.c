@@ -23,6 +23,7 @@
 #include "gfx.h"
 #include "gfx_wsys.h"
 #include "nvn_api.h"
+#include "ov.h"
 #include "ui/menu.h"
 #include "vk.h"
 #include "platform/platform.h"
@@ -211,9 +212,22 @@ static void window_settings_live(void) {
     static unsigned seen;
     static int started;
     static char present[16];   // the TOTK_VK_PRESENT the swapchain was made with
+    // A live resolution change needs two console-mode changes: the game rebuilds when the *reported* mode changes, and
+    // a rebuild while it reports handheld is capped at 720p (the handheld ceiling), so a change to a larger size only
+    // lands on the second one, when the mode goes back to docked. ov_operation_mode_flip starts that pair; the end of
+    // the flip is the second change, checked every present because no setting changes then.
+    if (ov_operation_mode_flip_ended()) {
+        oe_push_message(OE_MSG_OPERATION_MODE_CHANGED);
+        oe_push_message(OE_MSG_PERFORMANCE_MODE_CHANGED);
+        rt_log("resolution: pushed the second operation-mode change (back to the configured mode)");
+    }
     unsigned v = cfg_version();
     if (started && v == seen) return;
     seen = v;
+    // The window's new size must exist before the game is asked to rebuild: res_engage_live pushes the operation-mode
+    // message, and a game that rebuilds while the host window still has the old size keeps the old buffers (a 720p
+    // window that became 1080p kept drawing 720p).
+    if (started) gfx_window_apply_settings();
     res_fov_live();
     res_engage_live();
     const char *e = cfg_value("TOTK_VK_PRESENT");
@@ -221,7 +235,6 @@ static void window_settings_live(void) {
         snprintf(present, sizeof present, "%s", e);
         if (started) plat_xchg32(&g_dirty, 1);
     }
-    if (started) gfx_window_apply_settings();
     started = 1;
 }
 

@@ -49,7 +49,7 @@ static const char *const text_en[UI_TEXT_COUNT] = {
     [UI_MENU_VERSION] = "TotK Recomp %s, game %s",
 
     [UI_MENU_FULLSCREEN] = "Fullscreen", [UI_MENU_FULLSCREEN_DESC] = "Fills the screen with the game; F11 toggles it.",
-    [UI_MENU_WINDOW_SIZE] = "Window size", [UI_MENU_WINDOW_SIZE_DESC] = "Size of the game window when not fullscreen.",
+    [UI_MENU_WINDOW_SIZE] = "Window size", [UI_MENU_WINDOW_SIZE_DESC] = "Size of the game window when not fullscreen. Engage builds its display buffers at start, so a new size applies when the game next starts.",
     [UI_MENU_WINDOW_SIZE_CUSTOM] = "Custom",
     [UI_MENU_PRESENT] = "Presentation", [UI_MENU_PRESENT_DESC] = "How finished frames reach the screen.",
     [UI_MENU_PRESENT_MAILBOX] = "Mailbox", [UI_MENU_PRESENT_VSYNC] = "VSync", [UI_MENU_PRESENT_IMMEDIATE] = "Immediate",
@@ -75,9 +75,10 @@ static const char *const text_en[UI_TEXT_COUNT] = {
     [UI_MENU_ENGAGE_OUTPUT_DESC] = "The resolution Engage draws its picture and interface in. 16:9 sizes only. "
                                    "Higher resolutions use more GPU time and memory.",
     [UI_MENU_ENGAGE_SCALE_DESC] = "Size of the 3D scene relative to the game resolution. Game lets Engage choose "
-                                  "the scale for each scene. A percentage overrides that choice. Above 100 % "
-                                  "supersamples at a high GPU cost.",
+                                  "the scale for each scene. A percentage from 25 to 200 overrides that choice: above "
+                                  "100 % supersamples at a high GPU cost. Press A to type a value.",
     [UI_MENU_ENGAGE_SCALE_GAME] = "Game (scene dependent)",
+    [UI_MENU_ENGAGE_SCALE_DLSS] = "3D render scale: 100 % (DLSS mode sets the render ratio)",
     [UI_MENU_UPSCALER] = "Scaling to the window",
     [UI_MENU_UPSCALER_DESC] = "How the picture is scaled when the window is larger than the game resolution. FSR keeps "
                               "edges and detail sharper than bilinear.",
@@ -336,7 +337,7 @@ static const char *const text_ru[UI_TEXT_COUNT] = {
     [UI_MENU_VERSION] = "TotK Recomp %s, игра %s",
 
     [UI_MENU_FULLSCREEN] = "Полный экран", [UI_MENU_FULLSCREEN_DESC] = "Игра на весь экран; F11 переключает режим.",
-    [UI_MENU_WINDOW_SIZE] = "Размер окна", [UI_MENU_WINDOW_SIZE_DESC] = "Размер окна игры вне полноэкранного режима.",
+    [UI_MENU_WINDOW_SIZE] = "Размер окна", [UI_MENU_WINDOW_SIZE_DESC] = "Размер окна игры вне полноэкранного режима. Engage строит буферы дисплея при запуске, поэтому новый размер применяется при следующем запуске.",
     [UI_MENU_WINDOW_SIZE_CUSTOM] = "Другой",
     [UI_MENU_PRESENT] = "Вывод кадров", [UI_MENU_PRESENT_DESC] = "Как готовые кадры попадают на экран.",
     [UI_MENU_PRESENT_MAILBOX] = "Mailbox", [UI_MENU_PRESENT_VSYNC] = "Вертикальная синхронизация",
@@ -634,7 +635,7 @@ static const char *const text_zh_hans[UI_TEXT_COUNT] = {
     [UI_MENU_VERSION] = "TotK Recomp %s，游戏 %s",
 
     [UI_MENU_FULLSCREEN] = "全屏", [UI_MENU_FULLSCREEN_DESC] = "让游戏铺满屏幕；F11 可切换。",
-    [UI_MENU_WINDOW_SIZE] = "窗口大小", [UI_MENU_WINDOW_SIZE_DESC] = "非全屏时游戏窗口的大小。",
+    [UI_MENU_WINDOW_SIZE] = "窗口大小", [UI_MENU_WINDOW_SIZE_DESC] = "非全屏时游戏窗口的大小。Engage 在启动时创建显示缓冲，因此新尺寸在下次启动时生效。",
     [UI_MENU_WINDOW_SIZE_CUSTOM] = "自定义",
     [UI_MENU_PRESENT] = "呈现方式", [UI_MENU_PRESENT_DESC] = "完成的画面如何送到屏幕。",
     [UI_MENU_PRESENT_MAILBOX] = "Mailbox", [UI_MENU_PRESENT_VSYNC] = "垂直同步", [UI_MENU_PRESENT_IMMEDIATE] = "立即",
@@ -654,6 +655,7 @@ static const char *const text_zh_hans[UI_TEXT_COUNT] = {
     [UI_MENU_ENGAGE_OUTPUT_DESC] = "Engage 绘制画面与界面的分辨率。仅支持 16:9 尺寸。更高的分辨率消耗更多 GPU 时间与内存。",
     [UI_MENU_ENGAGE_SCALE_DESC] = "3D 场景相对游戏分辨率的大小。“游戏”由 Engage 为每个场景自行选择比例；填百分比可覆盖该选择。高于 100% 为超采样，GPU 开销很高。",
     [UI_MENU_ENGAGE_SCALE_GAME] = "游戏（按场景而定）",
+    [UI_MENU_ENGAGE_SCALE_DLSS] = "3D 渲染比例固定为 100%（由 DLSS 档位决定渲染比例）",
     [UI_MENU_UPSCALER] = "缩放到窗口",
     [UI_MENU_UPSCALER_DESC] = "窗口大于游戏分辨率时画面如何缩放。FSR 比双线性更锐利地保留边缘与细节。",
     [UI_MENU_UPSCALER_FSR] = "AMD FSR 1", [UI_MENU_UPSCALER_BILINEAR] = "双线性", [UI_MENU_UPSCALER_DLSS] = "NVIDIA DLSS",

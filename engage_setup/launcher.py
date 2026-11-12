@@ -21,7 +21,7 @@ SETTINGS = {
     'window_size': ('display', 'Window size', '1920x1080', {v: v for v in ('1280x720', '1600x900', '1920x1080', '2560x1440', '3200x1800', '3840x2160')}),
     'vk_present': ('display', 'Presentation', 'fifo', {'fifo': 'VSync', 'mailbox': 'Mailbox', 'immediate': 'Immediate'}),
     'perf_overlay': ('display', 'Performance overlay', 'off', {'off': 'Off', 'fps': 'FPS only', 'full': 'Full'}),
-    'render_scale': ('display', '3D render scale', 'game', {'game': 'Game default', **{str(v): str(v) + '%' for v in (50, 75, 100, 150)}}),
+    'render_scale': ('display', '3D render scale', 'game', None),   # free text: "game" or 25..200 (launcher.py render_scale_text)
     'upscaler': ('display', 'Scaling to the window', 'fsr', {'fsr': 'AMD FSR 1', 'bilinear': 'Bilinear', 'dlss': 'NVIDIA DLSS'}),
     'dlss_mode': ('display', 'DLSS mode', 'dlaa',
                   {'dlaa': 'DLAA', 'quality': 'Quality', 'balanced': 'Balanced', 'performance': 'Performance',
@@ -37,7 +37,33 @@ SETTINGS = {
 SETTINGS_NEEDS = {
     'dlss_mode': ('upscaler', ('dlss',)),
     'sharpness': ('upscaler', ('fsr', 'bilinear')),
+    'render_scale': ('upscaler', ('fsr', 'bilinear')),   # DLSS's mode sets the render ratio instead
 }
+# The 3D render scale is typed rather than picked: "game" keeps Engage's own choice, a number is a percentage. The
+# same limits as the runtime (runtime/resolution.c engage_apply clamps to them) so the launcher cannot write a value
+# the game would silently ignore.
+RENDER_SCALE_MIN, RENDER_SCALE_MAX = 25, 200
+
+
+def render_scale_text(value):
+    """The 3D render scale as the field shows it: "game" or "<n>%"."""
+    if value == 'game':
+        return 'Game default'
+    return value + '%'
+
+
+def render_scale_value(text):
+    """The ini value for what the player typed: "game" or a whole percentage inside the limits (or None if invalid)."""
+    text = text.strip().lower().removeprefix('game default').removesuffix('%').strip()
+    if not text or text.startswith('game'):
+        return 'game'
+    try:
+        number = int(round(float(text)))
+    except ValueError:
+        return None
+    if not RENDER_SCALE_MIN <= number <= RENDER_SCALE_MAX:
+        return None
+    return str(number)
 LINE = re.compile(r'^\s*(?:totk_)?([a-z0-9_]+)\s*=\s*(.*?)\s*$', re.I)
 
 
@@ -82,9 +108,26 @@ def write_settings(dest, changes):
         raise ValueError('engage.ini is a link. Use a regular settings file.')
     text = path.read_text(encoding='utf-8-sig') if path.exists() else ''
     lines = text.splitlines()
+    # DLSS decides what the game draws by its mode's ratio, so it pins the 3D render scale at 100 %: a percentage
+    # there would multiply with the mode (Performance at 50 % is a quarter of the game resolution). The runtime
+    # enforces the same (resolution.c engage_apply).
+    if changes.get('upscaler') == 'dlss':
+        changes = {**changes, 'render_scale': '100'}
     for key, value in changes.items():
-        if key != 'mods_disabled' and (key not in SETTINGS or value not in SETTINGS[key][3]):
-            raise ValueError('Choose a supported value for ' + key)
+        if key != 'mods_disabled':
+            if key not in SETTINGS:
+                raise ValueError('Choose a supported value for ' + key)
+            choices = SETTINGS[key][3]
+            if choices is None:
+                # a free-text row: normalize it through its validator, which refuses what the game would ignore
+                if key == 'render_scale':
+                    normalized = render_scale_value(value)
+                    if normalized is None:
+                        raise ValueError(f'3D render scale must be Game default or {RENDER_SCALE_MIN}–'
+                                         f'{RENDER_SCALE_MAX} %.')
+                    value = normalized
+            elif value not in choices:
+                raise ValueError('Choose a supported value for ' + key)
         if any(c in value for c in '\r\n'):
             raise ValueError('A setting must fit on one line.')
         matches = [i for i, line in enumerate(lines) if (m := LINE.match(line)) and m[1].lower() == key]
