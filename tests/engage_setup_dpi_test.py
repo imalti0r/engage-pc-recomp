@@ -44,7 +44,8 @@ class LauncherResolutionTest(unittest.TestCase):
 
     def test_dlss_rows_follow_the_upscaler(self):
         from engage_setup import launcher as ops
-        self.assertEqual([ops.row_visible(k, {'upscaler': 'dlss'}) for k in ('dlss_mode', 'sharpness')], [True, False])
+        # sharpness now applies to both upscalers (FSR's RCAS and DLSS's output mask), so only the DLSS mode row follows
+        self.assertEqual([ops.row_visible(k, {'upscaler': 'dlss'}) for k in ('dlss_mode', 'sharpness')], [True, True])
         self.assertEqual([ops.row_visible(k, {'upscaler': 'fsr'}) for k in ('dlss_mode', 'sharpness')], [False, True])
         self.assertEqual([ops.row_visible(k, {'upscaler': 'bilinear'}) for k in ('dlss_mode', 'sharpness')],
                          [False, True])

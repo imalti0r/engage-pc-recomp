@@ -451,7 +451,7 @@ static int init_pipelines(VkCtx *c) {
     VkDescriptorSetLayoutCreateInfo dci = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
                                            .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR,
                                            .bindingCount = 2, .pBindings = b};
-    VkPushConstantRange pr = {VK_SHADER_STAGE_COMPUTE_BIT, 0, 16};
+    VkPushConstantRange pr = {VK_SHADER_STAGE_COMPUTE_BIT, 0, 20};
     VkPipelineLayoutCreateInfo li = {.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, .setLayoutCount = 1,
                                      .pSetLayouts = &D.dsl, .pushConstantRangeCount = 1, .pPushConstantRanges = &pr};
     VkSamplerCreateInfo si = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .magFilter = VK_FILTER_NEAREST,
@@ -703,8 +703,22 @@ int vk_dlss_record(VkCommandBuffer cb, unsigned slot, VkImage src, VkFormat fmt,
     barrier(cb, D.out, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
             VK_ACCESS_2_MEMORY_WRITE_BIT, CS, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
-    // 3. encode into RGBA8, then the 1:1 blit into the swapchain
+    // 3. encode into RGBA8, then the 1:1 blit into the swapchain. The sharpening is the same TOTK_SHARPNESS the FSR path
+    // uses: DLSS gets no sub-pixel jitter from this game (no access to its projection), so its output is a little soft
+    // and a contrast-adaptive unsharp mask gives the crispness back.
+    int sharp = cfg_int("TOTK_SHARPNESS");
+    if (sharp < 0) sharp = 0;
+    if (sharp > 100) sharp = 100;
+    static int sharp_logged = -1;
+    if (sharp != sharp_logged) {
+        sharp_logged = sharp;
+        rt_log("vk: DLSS sharpening %d%%", sharp);
+    }
+    // The shader's block is { ivec2 size; float sharpness; } under std430, so sharpness sits at byte 8. Packing it into
+    // the third word (and not after the size) is what makes the value actually arrive.
     int32_t pc_out[4] = {(int32_t)ow, (int32_t)oh, 0, 0};
+    float sharp_f = (float)sharp;
+    memcpy(&pc_out[2], &sharp_f, 4);
     bind_pass(cb, D.encode, D.out_v, D.swp_v);
     vkCmdPushConstants(cb, D.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, 16, pc_out);
     vkCmdDispatch(cb, (ow + 7) / 8, (oh + 7) / 8, 1);

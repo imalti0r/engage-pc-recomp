@@ -1,12 +1,17 @@
 #version 450
-// DLSS output (runtime/vk_dlss.c): DLSS's linear RGBA16F result encoded back into the present's
+// DLSS output (runtime/vk_dlss.cpp): DLSS's linear RGBA16F result, optionally sharpened, encoded back into the present's
 // display encoding. An RGBA8 UNORM image: the 1:1 blit into the swapchain maps the named channels
 // red to red, green to green, whatever the swapchain's channel order is.
+//
+// The sharpening is a contrast-adaptive unsharp mask applied AFTER the encode, in display space. That matters: in linear
+// light a dark scene has almost no local range (0.02..0.05), so an unsharp mask there does nothing visible. In display
+// space the same edge spans 40..80 of 255 and the mask has something to work with. TOTK_SHARPNESS 0 turns it off.
 layout(local_size_x = 8, local_size_y = 8) in;
 layout(binding = 0) uniform sampler2D src;
 layout(binding = 1, rgba8) uniform writeonly image2D dst;
 layout(push_constant) uniform P {
-    ivec2 size;   // the size of both images
+    ivec2 size;      // the size of both images
+    float sharpness; // 0..100
 } pc;
 
 vec3 linear_to_srgb(vec3 c) {
@@ -14,9 +19,27 @@ vec3 linear_to_srgb(vec3 c) {
     return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, greaterThan(c, vec3(0.0031308)));
 }
 
+vec3 at(ivec2 p, ivec2 hi) { return linear_to_srgb(texelFetch(src, clamp(p, ivec2(0), hi), 0).rgb); }
+
 void main() {
     ivec2 p = ivec2(gl_GlobalInvocationID.xy);
     if (any(greaterThanEqual(p, pc.size))) return;
-    vec3 c = linear_to_srgb(texelFetch(src, p, 0).rgb);
+    ivec2 hi = pc.size - 1;
+    vec3 c = at(p, hi);
+    if (pc.sharpness > 0.5) {
+        // 8-neighbour ring: a smooth estimate of the local average the edge stands out from
+        vec3 blur = (at(p + ivec2(-1, -1), hi) + at(p + ivec2(0, -1), hi) + at(p + ivec2(1, -1), hi) +
+                     at(p + ivec2(-1,  0), hi) +                              at(p + ivec2(1,  0), hi) +
+                     at(p + ivec2(-1,  1), hi) + at(p + ivec2(0,  1), hi) + at(p + ivec2(1,  1), hi)) * 0.125;
+        vec3 detail = c - blur;
+        // Contrast adaptation keeps flat noise from being amplified, but it must not switch the mask off on soft content:
+        // a picture that is already blurry has a small local range, and that is exactly what needs sharpening. The 0.35
+        // floor guarantees a visible effect at any sharpness above zero.
+        float lo = min(min(min(blur.r, blur.g), blur.b), min(min(c.r, c.g), c.b));
+        float hiV = max(max(max(blur.r, blur.g), blur.b), max(max(c.r, c.g), c.b));
+        float edge = clamp((hiV - lo) * 6.0, 0.35, 1.0);
+        float amount = (pc.sharpness / 100.0) * 2.0 * edge;
+        c = clamp(c + detail * amount, 0.0, 1.0);
+    }
     imageStore(dst, p, vec4(c, 1.0));
 }

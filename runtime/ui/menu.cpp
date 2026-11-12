@@ -719,8 +719,8 @@ static void tab_screen(float scale) {
                                          UI_MENU_DLSS_PERFORMANCE, UI_MENU_DLSS_ULTRA};
         opt_choice("TOTK_DLSS_MODE", UI_MENU_DLSS_MODE, dmode, 5, UI_MENU_DLSS_MODE_DESC);
     }
-    if (rt_game_id != 1 || strcmp(cfg_value("TOTK_UPSCALER"), "dlss"))
-        opt_slider("TOTK_SHARPNESS", UI_MENU_SHARPNESS, 0, 100, UI_MENU_SHARPNESS_DESC, 5, "%.0f %%");
+    // Sharpness applies to both upscalers now: FSR's RCAS and DLSS's output mask both read TOTK_SHARPNESS.
+    opt_slider("TOTK_SHARPNESS", UI_MENU_SHARPNESS, 0, 100, UI_MENU_SHARPNESS_DESC, 5, "%.0f %%");
     static const UiTextId aspect[] = {UI_MENU_ASPECT_FIT, UI_MENU_ASPECT_STRETCH};
     opt_choice("TOTK_ASPECT", UI_MENU_ASPECT, aspect, 2, UI_MENU_ASPECT_DESC);
     if (rt_game_id != 1) opt_slider("TOTK_FOV", UI_MENU_FOV, 70, 140, UI_MENU_FOV_DESC, 5, "%.0f %%");

@@ -7,11 +7,19 @@ produced, in F1 → Screen → Picture, and a change takes effect at once — no
 - 3D render scale: Game, 50%, 75%, 100% or 150%. Game preserves Engage's own
   scene-dependent scale. A percentage overrides the render-pipeline camera scale;
   150% supersamples the scene and costs more GPU time and memory.
+- Sharpness (0–100 %): applies to both upscalers. FSR 1 sharpens with RCAS; DLSS
+  sharpens its output with a contrast-adaptive unsharp mask. DLSS reconstructs
+  detail from sub-pixel jitter across frames, and this port cannot supply the
+  game's projection matrix, so it feeds DLSS a zero jitter: the raw result is a
+  little soft and the mask gives the crispness back. 0 turns it off.
 - Upscaler (Scaling to the window): AMD FSR 1, Bilinear or NVIDIA DLSS. With
-  DLSS, the mode (DLAA / Quality / Performance / Ultra performance) divides the
-  resolution the game draws at: Quality draws 1.5× smaller, Performance 2×,
-  Ultra performance 3×, and DLSS upscales the picture back to the window's size.
-  DLAA draws at the window's size and only anti-aliases.
+  DLSS, the mode (DLAA / Quality / Balanced / Performance / Ultra performance)
+  divides the resolution the game draws at: Quality draws 1.5× smaller,
+  Performance 2×, Ultra performance 3×, and DLSS upscales the picture back to
+  the window's size. DLAA draws at the window's size and only anti-aliases.
+  With DLSS on, the 3D render scale is pinned at 100 %: the mode already sets the
+  render ratio and a second factor would compound with it (1080p Performance at
+  50 % would draw 480p) and break the exact ratio DLSS requires.
 
 The same settings can be written in `engage.ini` next to `engage.exe`:
 

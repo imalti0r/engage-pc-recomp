@@ -1,8 +1,11 @@
 #version 450
-// DLSS input (runtime/vk_dlss.c): the present's picture, crop rectangle at offset, decoded from its
+// DLSS input (runtime/vk_dlss.cpp): the present's picture, crop rectangle at offset, decoded from its
 // display encoding into linear light in an RGBA16F image for NVIDIA DLSS (DLAA / Super Resolution).
 // The stored values are sRGB display-encoded, whatever container they come from (the game's UNORM
 // display buffers or the colour adjustment's re-encoded RGBA16F).
+//
+// No jitter is applied: the game renders this picture itself and we never shift its projection, so
+// claiming a sub-pixel offset DLSS would then try to undo would only add error.
 layout(local_size_x = 8, local_size_y = 8) in;
 layout(binding = 0) uniform sampler2D src;
 layout(binding = 1, rgba16f) uniform writeonly image2D dst;

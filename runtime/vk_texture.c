@@ -1612,6 +1612,39 @@ static void sampler_features(VkCtx *c) {
     sf.init = 1;
 }
 
+// TOTK_TEX_LOD_BIAS (a float, default 0): added to every sampler's LOD bias. A negative value samples a sharper mip
+// level, which counteracts the softness of textures authored for a lower resolution; the cost is a little aliasing.
+static float tex_lod_bias(void) {
+    static int init;
+    static float bias;
+    if (!init) {
+        init = 1;
+        const char *s = cfg_get("TOTK_TEX_LOD_BIAS");
+        if (s && *s) {
+            char *end;
+            double v = strtod(s, &end);
+            if (end != s && !*end && isfinite(v)) bias = (float)v;
+        }
+    }
+    return bias;
+}
+
+// TOTK_ANISO (default 0 = the game's own sampler values): a floor on anisotropic filtering, 1..16.
+static float tex_aniso_min(void) {
+    static int init;
+    static float v;
+    if (!init) {
+        init = 1;
+        const char *s = cfg_get("TOTK_ANISO");
+        if (s && *s) {
+            char *end;
+            double d = strtod(s, &end);
+            if (end != s && !*end && isfinite(d) && d >= 1) v = (float)d;
+        }
+    }
+    return v;
+}
+
 static VkSampler make_sampler(VkCtx *c, const samp_par *d) {
     sampler_features(c);
     VkSamplerCreateInfo si = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
@@ -1642,10 +1675,15 @@ static VkSampler make_sampler(VkCtx *c, const samp_par *d) {
     if (mf <= NVN_MIN_FILTER_LINEAR) si.maxLod = si.minLod + 0.25f;   // not mipmapped: stay on the base level
     if (si.maxLod < si.minLod) si.maxLod = si.minLod;
     float lim = c->props.limits.maxSamplerLodBias;
-    si.mipLodBias = fmaxf(-lim, fminf(lim, d->lod_bias));
-    if (d->aniso > 1) {
+    // TOTK_TEX_LOD_BIAS: a negative bias makes textures sample sharper detail. At 4K the same texture covers more pixels
+    // than it was authored for, so it reads as soft; -0.5..-1.0 restores the crispness at a small aliasing cost.
+    si.mipLodBias = fmaxf(-lim, fminf(lim, d->lod_bias + tex_lod_bias()));
+    if (d->aniso > 1 || tex_aniso_min() > 1) {
+        // TOTK_ANISO (default 0 = the game's own value): a floor on anisotropy. Engage was authored for a 720p-class
+        // handheld, so its samplers ask for little or none; at 4K a ground plane seen at a shallow angle then smears.
+        float want = fmaxf(d->aniso, tex_aniso_min());
         si.anisotropyEnable = VK_TRUE;
-        si.maxAnisotropy = fminf(d->aniso, c->props.limits.maxSamplerAnisotropy);
+        si.maxAnisotropy = fminf(want, c->props.limits.maxSamplerAnisotropy);
     }
     if (d->cmp_mode) {
         si.compareEnable = VK_TRUE;

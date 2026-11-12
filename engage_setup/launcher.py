@@ -26,7 +26,7 @@ SETTINGS = {
     'dlss_mode': ('display', 'DLSS mode', 'dlaa',
                   {'dlaa': 'DLAA', 'quality': 'Quality', 'balanced': 'Balanced', 'performance': 'Performance',
                    'ultra': 'Ultra performance'}),
-    'sharpness': ('display', 'FSR sharpness', '80', {str(v): str(v) + '%' for v in range(0, 101, 5)}),
+    'sharpness': ('display', 'Sharpness', '80', {str(v): str(v) + '%' for v in range(0, 101, 5)}),
     'aspect': ('display', 'Picture shape', 'fit', {'fit': 'Black bars', 'stretch': 'Stretch'}),
     'fps_limit': ('frame rate', 'Frame rate limit', '60', {'30': '30 FPS', '60': '60 FPS'}),
     'lang': ('language', 'Game language', 'en-US', {'en-US': 'English', 'ja': 'Japanese', 'fr': 'French', 'de': 'German', 'it': 'Italian', 'es': 'Spanish', 'ko': 'Korean', 'zh-Hans': 'Chinese (simplified)', 'zh-Hant': 'Chinese (traditional)'}),
@@ -36,7 +36,6 @@ SETTINGS = {
 # not run is noise, and FSR's sharpness means nothing while DLSS produces the picture.
 SETTINGS_NEEDS = {
     'dlss_mode': ('upscaler', ('dlss',)),
-    'sharpness': ('upscaler', ('fsr', 'bilinear')),
     'render_scale': ('upscaler', ('fsr', 'bilinear')),   # DLSS's mode sets the render ratio instead
 }
 # The 3D render scale is typed rather than picked: "game" keeps Engage's own choice, a number is a percentage. The
