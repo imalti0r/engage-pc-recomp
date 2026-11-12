@@ -22,8 +22,12 @@ def main():
     expected = output / 'expected.json'
     expected.parent.mkdir(parents=True, exist_ok=True)
     if not extra.runtime_only:
-        # An updated install has already moved its RomFS into the game folder.
-        report = inspect_inputs(extracted / 'ExeFS', extracted / 'RomFS' if (extracted / 'RomFS').is_dir() else None)
+        # An installed game folder keeps its RomFS packed (romfs.bin + index.json), not as an extracted tree. Windows
+        # paths are case-insensitive, so `RomFS` also finds that packed directory: tell the two shapes apart instead of
+        # insisting on the extracted tree.
+        romfs_dir = next((p for p in (extracted / 'RomFS', extracted / 'romfs') if p.is_dir()), None)
+        packed = romfs_dir is not None and (romfs_dir / 'romfs.bin').is_file() and (romfs_dir / 'index.json').is_file()
+        report = inspect_inputs(extracted / 'ExeFS', None if packed or romfs_dir is None else romfs_dir)
         report['dlc'] = inspect_dlcs(extracted / 'aoc', require_all=False)
         npdm = extracted / 'ExeFS' / 'main.npdm'
         report['exefs_sha256']['main.npdm'] = hashlib.sha256(npdm.read_bytes()).hexdigest()
