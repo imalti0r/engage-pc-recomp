@@ -50,7 +50,9 @@ class LauncherGuiTest(unittest.TestCase):
         save.write_bytes(b'original save')
         self.root = tk.Tk()
         self.root.withdraw()
-        self.app = Launcher(self.root, layout(), self.dest, remember=False)
+        # the launcher follows the saved/system language; these assertions are the English wording
+        with patch('engage_setup.launcher_gui.load_language', return_value='en'):
+            self.app = Launcher(self.root, layout(), self.dest, remember=False)
 
     def tearDown(self):
         if self.app.wizard and self.app.wizard.winfo_exists():
@@ -191,7 +193,7 @@ class LauncherGuiTest(unittest.TestCase):
 
     def test_update_requires_confirmation_and_runs_prepare_off_the_ui_thread(self):
         from engage_setup.updates import Update
-        info = Update('0.1.0-alpha.6', 'https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.6',
+        info = Update('0.1.0-alpha.6', 'https://github.com/imalti0r/engage-pc-recomp/releases/tag/engage-v0.1.0-alpha.6',
                       'Engage-Setup-0.1.0-alpha.6-windows.zip')
         self.app.update_info = info
         self.app.layout.dev = False

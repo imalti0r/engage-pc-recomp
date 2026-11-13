@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
 
 from installer.gui import App as BaseApp, fix_tcl_paths
+from .i18n import load_language
 from .model import Catalog, FIELDS, Form, layout
 
 
@@ -123,7 +124,7 @@ def main():
     from .dpi import apply as dpi_apply
     dpi_apply(root)
     if args.setup:
-        app = App(root, 'en', paths)
+        app = App(root, load_language(), paths)
         if args.dest:
             app.vars['dest'].set(args.dest)
     else:

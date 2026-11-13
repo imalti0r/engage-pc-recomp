@@ -17,7 +17,8 @@ BINARY_SUFFIXES = {'.exe', '.dll', '.pdb', '.o', '.obj', '.a', '.lib', '.log', '
 # Reviewed launcher/setup screenshots, without game assets or personal paths (docs/screenshots/README.md).
 REVIEWED_SCREENSHOTS = {
     'docs/screenshots/setup.png': '7b84a39b22804243888fefd300ad3a9c3c996967b0d3eebd15b5d8f62893265c',
-    'docs/screenshots/launcher.png': '10a6f5f32d08f682833865d4d13daa66321d955c823819a87ed07e151c8d3cee',
+    'docs/screenshots/launcher.png': '14351256193043108fda0d59333c7e4c4387c4a963aadafbaed500e0c18d227f',
+    'docs/screenshots/settings.png': '1bd0863287545305a1072538013b7d2f97413e5b26cfcd3cf487557e703646cf',
 }
 # Original commissioned launcher illustration/lettering, not extracted game data (art/README.md).
 LAUNCHER_ART = {

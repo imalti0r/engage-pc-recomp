@@ -81,6 +81,10 @@ appears only while DLSS is the upscaler, and FSR sharpness only while FSR or
 bilinear is, exactly as the in-game tab shows them. More controls remain
 available with F1 in-game.
 
+The launcher's own interface language is picked with the button at the top right (**English** / **简体中文**). It is
+remembered per user in `%APPDATA%\Engage PC Recomp\launcher.json` and is separate from the game's language setting:
+a player may read the launcher in Chinese and play the game in English. The first start follows the Windows language.
+
 Save loading happens in the game's title menu. **Open folder** opens
 `profile/save`; **Back up** makes a ZIP in `save-backups`, including committed
 saves and pending save transactions. It never restores or overwrites a save.

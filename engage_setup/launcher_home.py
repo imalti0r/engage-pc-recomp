@@ -5,6 +5,7 @@ from tkinter import ttk
 
 from PIL import Image, ImageOps, ImageTk
 from . import launcher as ops
+from .i18n import tr
 from .launcher_controls import Button
 from .launcher_typography import UI_FONT
 
@@ -35,23 +36,23 @@ class Home(ttk.Frame):
             if i:
                 ttk.Separator(summary, orient='vertical').grid(row=0, column=i * 2 - 1, sticky='ns', padx=(20, 0))
         for panel, title in ((display, 'Display'), (mods, 'Mods'), (saves, 'Saves')):
-            ttk.Label(panel, text=title, style='SummaryHeading.TLabel').pack(anchor='w', pady=(0, 8))
+            ttk.Label(panel, text=tr(title), style='SummaryHeading.TLabel').pack(anchor='w', pady=(0, 8))
         ttk.Label(display, textvariable=self.display).pack(anchor='w')
-        ttk.Button(display, text='Edit settings', style='Link.TButton', command=lambda: app.show('settings')).pack(anchor='w', pady=(8, 0))
+        ttk.Button(display, text=tr('Edit settings'), style='Link.TButton', command=lambda: app.show('settings')).pack(anchor='w', pady=(8, 0))
         ttk.Label(mods, textvariable=self.mod_count).pack(anchor='w')
         ttk.Label(mods, textvariable=self.mod_name, style='Muted.TLabel', width=30).pack(anchor='w', pady=(2, 4))
-        ttk.Button(mods, text='Manage mods', style='Link.TButton', command=lambda: app.show('mods')).pack(anchor='w')
+        ttk.Button(mods, text=tr('Manage mods'), style='Link.TButton', command=lambda: app.show('mods')).pack(anchor='w')
         buttons = ttk.Frame(saves)
         buttons.pack(anchor='w', pady=(4, 0))
-        self.open_saves = Button(buttons, text='Open folder', icon='folder', width=145,
+        self.open_saves = Button(buttons, text=tr('Open folder'), icon='folder', width=145,
                                  command=lambda: app.open_folder('profile/save'))
         self.open_saves.pack(side='left')
-        self.backup = Button(buttons, text='Back up', icon='backup', width=125, command=app.backup)
+        self.backup = Button(buttons, text=tr('Back up'), icon='backup', width=125, command=app.backup)
         self.backup.pack(side='left', padx=(10, 0))
         ttk.Separator(self).pack(side='bottom', fill='x')
         self.canvas = tk.Canvas(self, bg=BG, highlightthickness=0)
         self.canvas.pack(fill='both', expand=True)
-        self.play_button = Button(self.canvas, text='Play Engage', command=app.play, gold=True, icon='play', width=377, height=64)
+        self.play_button = Button(self.canvas, text=tr('Play Engage'), command=app.play, gold=True, icon='play', width=377, height=64)
         self.canvas.bind('<Configure>', self.schedule)
         self.bind('<Destroy>', self.on_destroy)
         self.state = None
@@ -82,20 +83,39 @@ class Home(ttk.Frame):
         y = int(h * .56)
         self.dot = self.canvas.create_oval(left, y - 4, left + 8, y + 4, fill='#80c973', outline='')
         self.status = self.canvas.create_text(left + 19, y, text='', fill=INK, anchor='w', font=(UI_FONT, 11, 'bold'))
-        self.canvas.create_line(left + 162, y - 10, left + 162, y + 10, fill='#465266')
-        self.canvas.create_text(left + 176, y, text='Game 2.0.0', fill=MUTED, anchor='w', font=(UI_FONT, 11))
+        # The status word changes length ("Ready to play", "Setup needed", "Working…"), so the rule and the version
+        # that follow it are placed from the text's measured width instead of a fixed offset, which used to overlap.
+        self.rule = self.canvas.create_line(0, 0, 0, 0, fill='#465266')
+        self.version = self.canvas.create_text(0, y, text=tr('Game 2.0.0'), fill=MUTED, anchor='w', font=(UI_FONT, 11))
+        self.place_rule()
         self.play_button.set_size(width, 64)
-        self.canvas.create_window(left, int(h * .65), window=self.play_button, anchor='nw', width=width, height=64)
-        self.canvas.create_text(left + width // 2, int(h * .65) + 86, text='F1 for in-game settings',
+        # a translated label can need more room than the design width: let the canvas window take the button's own
+        # requested size (width 0 means "use the requested size"), otherwise the wider picture is cut off and a dark
+        # strip shows beside it
+        button_w = self.play_button.size[0]
+        button_h = self.play_button.size[1]
+        self.canvas.create_window(left, int(h * .65), window=self.play_button, anchor='nw', width=button_w, height=button_h)
+        caption_y = int(h * .65) + button_h + 22
+        self.canvas.create_text(left + button_w // 2, caption_y, text=tr('F1 for in-game settings'),
                                 fill=INK, font=(UI_FONT, 11, 'italic'))
         if self.state:
             self.set_state(*self.state)
 
+    def place_rule(self):
+        """Put the divider and the version just after the status word, whatever its width."""
+        left = int(self.canvas.winfo_width() * .038)
+        y = int(self.canvas.winfo_height() * .56)
+        box = self.canvas.bbox(self.status)
+        end = (box[2] if box else left + 19) + 14
+        self.canvas.coords(self.rule, end, y - 10, end, y + 10)
+        self.canvas.coords(self.version, end + 14, y)
+
     def set_state(self, ready, running, busy):
         self.state = ready, running, busy
         if hasattr(self, 'status'):
-            self.canvas.itemconfigure(self.status, text='Game running' if running else 'Working…' if busy else 'Ready to play' if ready else 'Setup needed')
+            self.canvas.itemconfigure(self.status, text=tr('Game running') if running else tr('Working…') if busy else tr('Ready to play') if ready else tr('Setup needed'))
             self.canvas.itemconfigure(self.dot, fill='#80c973' if ready else GOLD)
+            self.place_rule()
         self.backup.configure(state='normal' if ready and not running and not busy else 'disabled')
         self.open_saves.configure(state='normal' if ready else 'disabled')
 
@@ -106,5 +126,5 @@ class Home(ttk.Frame):
         self.display.set(f"{values.get('window_size', '1920x1080').replace('x', ' × ')}   ·   "
                          f"{upscaler}   ·   {values.get('fps_limit', '60')} FPS")
         enabled = [m for m in mods if m.enabled and not m.problem]
-        self.mod_count.set(f'{len(enabled)} enabled')
-        self.mod_name.set(enabled[0].name if len(enabled) == 1 else 'Ready for the next launch' if enabled else 'No mods enabled')
+        self.mod_count.set(f'{len(enabled)}' + tr(' enabled'))
+        self.mod_name.set(enabled[0].name if len(enabled) == 1 else tr('Ready for the next launch') if enabled else tr('No mods enabled'))

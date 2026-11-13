@@ -13,7 +13,7 @@ compliance with an accessibility standard. Linux and Steam Deck are also unverif
 The port does not currently provide a documented set of additional in-game
 accessibility features.
 
-To report a barrier, [open an issue](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/issues/new).
+To report a barrier, [open an issue](https://github.com/imalti0r/engage-pc-recomp/issues/new).
 Include the version, affected screen, what you tried, what happened and what would
 help. Mention your input device, display settings or assistive technology when
 relevant. Screenshots are optional; remove private information before sharing.

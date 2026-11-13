@@ -23,14 +23,24 @@ class Pill(tk.Label):
 class Button(tk.Button):
     def __init__(self, parent, *, text, command, width=120, height=36, gold=False, icon=None, plain=False):
         self.gold, self.icon, self.size, self.plain = gold, icon, (width, height), plain
+        self.min_width = width
         super().__init__(parent, text=text, command=command, compound='center', relief='flat',
                          borderwidth=0, highlightthickness=1, highlightbackground=BG,
                          highlightcolor='#ecc254', bg=BG, activebackground=BG,
                          fg=BG if gold else '#eee9dd', activeforeground=BG if gold else '#fff',
                          disabledforeground='#798395', font=('Georgia', 20, 'bold') if gold else (UI_FONT, 11))
+        self.fit_text()
         self.make_images()
         self.bind('<Enter>', lambda _: self.paint(True))
         self.bind('<Leave>', lambda _: self.paint(False))
+
+    def fit_text(self):
+        """Widen the button when its wording does not fit. The widths are tuned for English; a translated label
+        (Chinese is set in a wider face at the same size) would otherwise be cut off."""
+        measured = tkfont.Font(font=self['font']).measure(self['text'])
+        room = self.min_width - (58 if self.icon else 34)
+        self.size = (max(self.min_width, measured + (58 if self.icon else 34)), self.size[1])
+        return room
 
     def make_images(self):
         w, h = self.size
@@ -84,6 +94,7 @@ class Button(tk.Button):
                     line([(9, -6), (9, 5), (4, 0)])
                     line([(9, 5), (14, 0)])
             self.images[state] = ImageTk.PhotoImage(image.resize((w, h), Image.Resampling.LANCZOS))
+        self.built = self.size
         self.paint()
 
     def paint(self, hover=False):
@@ -97,12 +108,16 @@ class Button(tk.Button):
         result = super().configure(cnf, **kw)
         if hasattr(self, 'images'):
             if rebuild:
+                self.fit_text()
                 self.make_images()
             elif 'state' in kw:
                 self.paint()
         return result
 
     def set_size(self, width, height):
-        if self.size != (width, height):
-            self.size = width, height
+        # the caller's width is the minimum; longer wording still has room
+        self.min_width = width
+        self.fit_text()
+        if getattr(self, 'built', None) != self.size:
+            self.size = (self.size[0], height)
             self.make_images()

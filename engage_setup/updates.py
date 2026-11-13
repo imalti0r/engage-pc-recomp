@@ -12,8 +12,8 @@ import zipfile
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-RELEASES_API = 'https://gitlab.com/api/v4/projects/88458502/releases?per_page=20'
-RELEASES_PAGE = 'https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/'
+RELEASES_API = 'https://api.github.com/repos/imalti0r/engage-pc-recomp/releases?per_page=20'
+RELEASES_PAGE = 'https://github.com/imalti0r/engage-pc-recomp/releases/tag/'
 VERSION = re.compile(r'^(?:engage-)?v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*))?$')
 
 
@@ -33,13 +33,24 @@ class Update:
     file_name: str = ''
 
 
+def download_url(tag, name):
+    """A release asset's address: GitHub serves assets from a per-tag path."""
+    return f'https://github.com/imalti0r/engage-pc-recomp/releases/download/{quote(tag, safe="")}/{quote(name, safe="")}'
+
+
+def asset_names(version):
+    """The names a release may give its setup ZIP: versioned (GitLab style) or plain (GitHub style)."""
+    return {f'Engage-Setup-{version}-windows.zip', 'Engage-Setup-windows.zip',
+            f'Engage-Launcher-{version}-windows.zip', 'Engage-Launcher-windows.zip'}
+
+
 def select_update(current, releases):
     installed = version_key(current)
     if installed is None or not isinstance(releases, list):
         raise ValueError('Invalid release version or response.')
     newest = None
     for release in releases:
-        if not isinstance(release, dict) or release.get('upcoming_release'):
+        if not isinstance(release, dict) or release.get('upcoming_release') or release.get('draft'):
             continue
         tag = release.get('tag_name', '')
         if not isinstance(tag, str) or len(tag) > 100:
@@ -48,10 +59,13 @@ def select_update(current, releases):
         if candidate is None or candidate <= installed or (installed[3] and not candidate[3]):
             continue
         version = tag.removeprefix('engage-').removeprefix('v')
-        expected = {f'Engage-Setup-{version}-windows.zip', f'Engage-Launcher-{version}-windows.zip'}
+        expected = asset_names(version)
         assets = release.get('assets', {})
-        links = assets.get('links', []) if isinstance(assets, dict) else []
-        package = next((link['name'] for link in links if isinstance(link, dict) and link.get('name') in expected), None) if isinstance(links, list) else None
+        # GitLab: {"links": [{"name": …}]}; GitHub: [{"name": …, "browser_download_url": …}]
+        links = assets.get('links', []) if isinstance(assets, dict) else assets
+        if not isinstance(links, list):
+            continue
+        package = next((link['name'] for link in links if isinstance(link, dict) and link.get('name') in expected), None)
         if not package:
             continue  # Source-only releases do not update a player's launcher.
         if newest is None or candidate > newest[0]:
@@ -61,7 +75,7 @@ def select_update(current, releases):
 
 def check_for_update(current):
     request = Request(RELEASES_API, headers={'User-Agent': 'Engage-PC-Recomp/' + current,
-                                           'Accept': 'application/json'})
+                                           'Accept': 'application/vnd.github+json'})
     with urlopen(request, timeout=8) as response:
         data = response.read(2 * 1024 * 1024 + 1)
     if len(data) > 2 * 1024 * 1024:
@@ -83,7 +97,7 @@ def validate_update(info):
     tag = info.page_url.removeprefix(RELEASES_PAGE)
     if not info.page_url.startswith(RELEASES_PAGE) or version_key(tag) != version_key(info.version):
         raise ValueError('The update is not an official project release.')
-    if info.file_name not in {package_name(info.version) + '.zip', f'Engage-Launcher-{info.version}-windows.zip'}:
+    if info.file_name not in asset_names(info.version):
         raise ValueError('Unexpected update package name.')
 
 
@@ -92,6 +106,7 @@ def prepare_update(info, current_root, progress, cancel):
     validate_update(info)
     current_root = Path(current_root).resolve()
     parent = current_root.parent
+    tag = info.page_url.removeprefix(RELEASES_PAGE)
     def check_cancel():
         if cancel.is_set():
             raise Cancelled('Update cancelled. Your current version is unchanged.')
@@ -99,7 +114,7 @@ def prepare_update(info, current_root, progress, cancel):
         return urlopen(Request(url, headers={'User-Agent': 'Engage-PC-Recomp-Updater', 'Accept': '*/*'}), timeout=15)
     check_cancel()
     progress(0, 0, 'Reading update checksum…')
-    with request(info.page_url + '/downloads/SHA256SUMS') as response:
+    with request(download_url(tag, 'SHA256SUMS')) as response:
         checksums = response.read(128 * 1024 + 1)
     if len(checksums) > 128 * 1024:
         raise ValueError('The update checksum list is invalid.')
@@ -116,7 +131,7 @@ def prepare_update(info, current_root, progress, cancel):
             raise ValueError('Unexpected update staging directory.')
         archive_path = stage / 'download.zip'
         digest, done = hashlib.sha256(), 0
-        with request(info.page_url + '/downloads/' + quote(info.file_name, safe='')) as response, archive_path.open('xb') as out:
+        with request(download_url(tag, info.file_name)) as response, archive_path.open('xb') as out:
             total = int(response.headers.get('Content-Length') or 0)
             if total > 2 * 1024 ** 3:
                 raise ValueError('This update package is too large.')

@@ -4,7 +4,7 @@ Do not attach or link game files, keys, firmware or builds. Issues that do are c
 
 ## Existing issues
 
-- [ ] I read the pinned issues and [searched open and closed issues](https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/issues?state=all) for this bug.
+- [ ] I read the pinned issues and [searched open and closed issues](https://github.com/imalti0r/engage-pc-recomp/issues?q=is%3Aissue) for this bug.
 
 ## Area
 

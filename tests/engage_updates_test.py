@@ -15,9 +15,13 @@ from engage_setup.updates import (Cancelled, activate_update, check_for_update,
     prepare_update, redirect_target, select_update, version_key)
 
 
-def release(version, ready=True, upcoming=False):
+def release(version, ready=True, upcoming=False, github=False):
+    name = f'Engage-Setup-{version}-windows.zip'
+    if github:
+        return {'tag_name': 'engage-v' + version, 'draft': upcoming,
+                'assets': [{'name': name, 'browser_download_url': f'https://github.com/x/y/releases/download/t/{name}'}] if ready else []}
     return {'tag_name': 'engage-v' + version, 'upcoming_release': upcoming,
-            'assets': {'links': [{'name': f'Engage-Setup-{version}-windows.zip'}] if ready else []}}
+            'assets': {'links': [{'name': name}] if ready else []}}
 
 
 class UpdateTest(unittest.TestCase):
@@ -33,7 +37,18 @@ class UpdateTest(unittest.TestCase):
             release('1.0.0', ready=False), release('2.0.0', upcoming=True),
             {'tag_name': 'https://elsewhere.example/evil'}]))
         update = select_update('0.1.0-alpha.5', [release('0.1.0-alpha.6')])
-        self.assertEqual(update.page_url, 'https://gitlab.com/engage-pc-recomp/engage-pc-recomp/-/releases/engage-v0.1.0-alpha.6')
+        self.assertEqual(update.page_url, 'https://github.com/imalti0r/engage-pc-recomp/releases/tag/engage-v0.1.0-alpha.6')
+
+    def test_github_release_shape_and_plain_asset_name(self):
+        # GitHub returns assets as a list and the releases here name the ZIP without a version.
+        update = select_update('0.1.0-alpha.12', [release('0.1.0-alpha.13', github=True)])
+        self.assertEqual(update.version, '0.1.0-alpha.13')
+        self.assertEqual(update.file_name, 'Engage-Setup-0.1.0-alpha.13-windows.zip')
+        plain = {'tag_name': 'engage-v0.1.0-alpha.13',
+                 'assets': [{'name': 'Engage-Setup-windows.zip', 'browser_download_url': 'https://github.com/x/y/releases/download/t/z.zip'}]}
+        self.assertEqual(select_update('0.1.0-alpha.12', [plain]).file_name, 'Engage-Setup-windows.zip')
+        # A draft release is not offered.
+        self.assertIsNone(select_update('0.1.0-alpha.12', [release('0.1.0-alpha.13', upcoming=True, github=True)]))
 
     def test_network_response_and_timeout_are_read_only(self):
         response = MagicMock()

@@ -48,10 +48,51 @@ for name in ('dlc1', 'dlc2', 'title_keys', 'xci'):
     TEXT['ui.missing_' + name] = f'The selected {name.replace("_", ".")} file does not exist.'
 
 
+TEXT_ZH = {
+    'ui.title': 'Engage 安装器',
+    'ui.intro': '选择你的游戏文件和安装文件夹。安装器会在本机构建 Engage。\n'
+                '合并的卡带导出（一个包含本体、2.0.0 更新和 DLC 的 XCI）可以放在第一个输入框，'
+                '本体、更新和 DLC 字段留空即可。也可以分开提供文件。\n'
+                '首次安装可能需要 20–60 分钟；你可以跟随下面的每一步。',
+    'ui.notice': '实验性 alpha 版本。开场动画、音频和第一场战斗已经测试过。\n完整通关和长时间稳定性尚未验证。',
+    'ui.base': '本体游戏（NSP / XCI）', 'ui.update': '更新 2.0.0（NSP）',
+    'ui.firmware': '固件 NCA 文件夹', 'ui.dlc1': '扩展包（可选）',
+    'ui.dlc2': '英雄们的秩序（可选）', 'ui.title_keys': 'title.keys（可选）',
+    'ui.xci': '合并 XCI（本体 + 2.0.0 更新 + DLC）',
+    'ui.pick_xci': '选择合并的卡带导出（XCI）',
+    'ui.xci_note': '合并 XCI 覆盖本体、2.0.0 更新以及其中包含的 DLC；下面的字段保持为空，'
+                   '除非你想补充 XCI 里没有的文件。',
+    'ui.need_xci': '请选择合并 XCI，或选择本体和更新。',
+    'ui.keys_private': '密钥从所选文件就地读取，绝不会复制进安装文件夹。\n请妥善保管你的游戏导出和密钥。安装盘至少需要 40 GiB 可用空间。',
+    'ui.need_update': '请选择 Engage 2.0.0 更新。',
+    'ui.need_firmware': '请选择已解包的固件 NCA 文件夹。',
+    'ui.missing_firmware': '固件文件夹不存在。',
+    'ui.done_text': 'Engage 已安装到 {dest}。点击「启动 Engage」开始。你的原始导出未被改动。',
+    'ui.update_mode': '此文件夹里有一个未完成的 Engage 安装，安装器会继续它。\n请使用与之前相同的输入文件。',
+    'ui.update_ready': '更新模式：此文件夹已安装 Engage。\n把所有文件字段留空并点击「更新 Engage」。存档和设置会保留，游戏数据不会重新提取。',
+    'ui.update_start': '更新 Engage',
+    'ui.play': '启动 Engage',
+    'ui.start': '安装 Engage',
+    'setup.failure': '{message}',
+    'step.prepare': '检查并完成',
+    'step.compile': '编译 Engage',
+    'phase.extract.merge': '正在校验并合并本体与更新…',
+    'phase.extract.fonts': '正在提取并校验共享字体…',
+    'phase.extract.pack': '正在安装盘上打包游戏数据…',
+    'phase.lift.work': '正在为本机重编译 ARM64 游戏代码…',
+    'phase.compile.work': '正在编译本机可执行文件…',
+    'phase.prepare.work': '正在检查构建并安装本地文件…',
+}
+for _name, _label in (('dlc1', 'dlc.1'), ('dlc2', 'dlc.2'), ('title_keys', 'title.keys'), ('xci', 'XCI')):
+    TEXT_ZH['ui.missing_' + _name] = f'所选的 {_label} 文件不存在。'
+
+
 class Catalog(BaseCatalog):
     def set_language(self, lang):
         super().set_language('en')
         self.texts.update(TEXT)
+        if lang == 'zh-Hans':
+            self.texts.update(TEXT_ZH)
 
 
 def installed_state(dest):
