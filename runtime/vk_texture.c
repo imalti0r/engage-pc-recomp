@@ -27,6 +27,7 @@
 #include "tex.h"
 #include "vk.h"
 #include "vk_exec.h"
+#include "vk_prompts.h"
 #include "platform/platform.h"
 
 typedef struct {
@@ -638,15 +639,28 @@ static void upload(Tex *e) {
     uint32_t levels = linear ? 1 : e->pub.levels, layers = linear ? 1 : e->pub.layers;
     int astc = e->f.astc_bw != 0, rgb = e->f.expand_rgb;
     int agpu = astc && vk_astc_gpu(), acheck = agpu && vk_astc_mode() == VK_ASTC_CHECK;   // raw blocks to the GPU
+    // TOTK_PROMPTS=pc: a 256x256 one-level ASTC texture may be one of the game's two button-prompt atlases. Such a
+    // texture takes the CPU path, because the picture uploaded in its place is RGBA8 and the game's own has to be
+    // decoded once to be recognised. Everything else keeps the GPU decoder.
+    int candidate = astc && e->f.astc_bw == 4 && e->f.astc_bh == 4 && d->width == 256 && d->height == 256;
+    int agpu_eff = agpu && !candidate;
+    if (astc && e->f.astc_bw == 4 && e->f.astc_bh == 4) {
+        static int traced_4x4;
+        if (traced_4x4 < 12) {
+            traced_4x4++;
+            rt_log("prompts: ASTC 4x4 texture %#llx %ux%u fmt %#x, %u levels", (unsigned long long)e->pub.addr, d->width,
+                   d->height, d->format, levels);
+        }
+    }
     uint32_t n = levels * layers, k = 0;
     VkBufferImageCopy *rg = calloc(n, sizeof *rg);
-    VkAstcRegion *ar = agpu ? calloc(n, sizeof *ar) : NULL;
+    VkAstcRegion *ar = agpu_eff ? calloc(n, sizeof *ar) : NULL;
     VkDeviceSize total = 0, decoded = 0;
     for (uint32_t lv = 0; lv < levels; lv++)
         for (uint32_t ly = 0; ly < layers; ly++) {
             uint32_t w = mip(d->width, lv), h = one_d ? 1 : mip(d->height, lv), sl = is3d ? mip(d->depth, lv) : 1;
             uint64_t texels = (uint64_t)w * h * sl, raw = (uint64_t)(w + bw - 1) / bw * bpb * ((h + bh - 1) / bh) * sl;
-            uint64_t out = agpu ? raw : astc ? texels * 4 : rgb ? texels * (uint64_t)bpb / 3 * 4 : raw;
+            uint64_t out = agpu_eff ? raw : astc ? texels * 4 : rgb ? texels * (uint64_t)bpb / 3 * 4 : raw;
             rg[k++] = (VkBufferImageCopy){.bufferOffset = total, .imageSubresource = {e->pub.aspect, lv, ly, 1},
                                           .imageExtent = {w, h, sl}};
             total += (out + 15) & ~15ull;
@@ -661,7 +675,7 @@ static void upload(Tex *e) {
     // takes the raw blocks of every region from one buffer.
     for (uint32_t k0 = 0, k1; k0 < n; k0 = k1) {
         VkDeviceSize base = rg[k0].bufferOffset, size;
-        for (k1 = k0 + 1; k1 < n && (agpu || (k1 + 1 < n ? rg[k1 + 1].bufferOffset : total) - base <= UPLOAD_PART);) k1++;
+        for (k1 = k0 + 1; k1 < n && (agpu_eff || (k1 + 1 < n ? rg[k1 + 1].bufferOffset : total) - base <= UPLOAD_PART);) k1++;
         size = (k1 < n ? rg[k1].bufferOffset : total) - base;
         if (k0) parts++;
         VkCommandBuffer cb = vk_upload_begin();
@@ -673,13 +687,24 @@ static void upload(Tex *e) {
             uint32_t rb = (w + bw - 1) / bw * (uint32_t)bpb, rows = (h + bh - 1) / bh;
             size_t raw = (size_t)rb * rows * sl;
             rg[k].bufferOffset -= base;
-            uint8_t *dst = stg + rg[k].bufferOffset, *tmp = (astc && !agpu) || rgb ? malloc(raw) : NULL;
+            uint8_t *dst = stg + rg[k].bufferOffset, *tmp = (astc && !agpu_eff) || rgb ? malloc(raw) : NULL;
+            // TOTK_PROMPTS=pc: one of the game's two button-prompt atlases (256x256, one level, one layer). Such a
+            // texture always takes the CPU path: the picture we upload instead is RGBA8, and the game's own must be
+            // decoded once anyway to be recognised.
+            const uint8_t *pc = NULL;
+            if (candidate && lv == 0 && vk_prompt_icons_override(e->pub.addr, w, h, &pc) && pc) {
+                memcpy(dst, pc, (size_t)w * h * 4);
+                vk_prompt_icons_flip(e->pub.addr, dst, w, h);   // match the game's own row order
+                rg[k].bufferRowLength = w, rg[k].bufferImageHeight = h;
+                free(tmp);
+                continue;
+            }
             if (nvn_deswizzle(d, lv, ly, t->mem, tmp ? tmp : dst, rb)) {
                 log_limited(&n_bad, "texture %#llx fmt %#x target %d: level %u layer %u has no CPU layout; uploaded as zeros",
                             (unsigned long long)e->pub.addr, d->format, d->target, lv, ly);
                 memset(tmp ? tmp : dst, 0, raw);
             }
-            if (agpu) {
+            if (agpu_eff) {
                 ar[k] = (VkAstcRegion){.src = rg[k].bufferOffset, .w = w, .h = h, .slices = sl, .level = lv, .layer = ly};
             } else if (astc) {
                 uint64_t a0 = perf_begin();
@@ -688,6 +713,8 @@ static void upload(Tex *e) {
                                        dst + (size_t)z * w * h * 4);
                 perf_end(PERF_ASTC, a0);
                 rg[k].bufferRowLength = w, rg[k].bufferImageHeight = h;
+                // the game's own button-prompt atlas, now decoded: recognise it so a later switch can find it
+                if (candidate && lv == 0) vk_prompt_icons_note_upload(e->pub.addr, dst, w, h);
             } else if (rgb) {
                 expand_rgb(d->format, tmp, dst, (size_t)w * h * sl);
                 rg[k].bufferRowLength = w, rg[k].bufferImageHeight = h;
@@ -701,7 +728,7 @@ static void upload(Tex *e) {
             memcpy(raw_copy, stg, size);
         }
         barrier(cb, ALL_RW, VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
-        if (agpu) {
+        if (agpu_eff) {
             uint64_t a0 = perf_begin();
             checked = vk_astc_record(cb, sb, size, ar, (int)n, e->f.astc_bw, e->f.astc_bh, e->f.astc_srgb, e->f.astc_bc,
                                      e->pub.image, e->pub.aspect, rbuf);
@@ -1166,6 +1193,31 @@ int vk_texture_slot_swz(int id, uint8_t swz[4]) {
 }
 
 uint32_t vk_texture_epoch(void) { return __atomic_load_n(&submit_epoch, __ATOMIC_RELAXED); }
+
+// TOTK_PROMPTS=pc: the input source changed, so the button-prompt atlases must be uploaded again with the other
+// picture. They are uploaded directly: make_fresh only re-uploads a mirrored texture, and these are brought in once at
+// load and never written again, so clearing the flag alone would never reach the uploader.
+int vk_texture_prompts_refresh(void) {
+    uint64_t addrs[8];
+    size_t n = vk_prompt_icons_addresses(addrs, sizeof addrs / sizeof *addrs), done = 0;
+    lock();
+    for (size_t i = 0; i < n; i++) {
+        for (Tex *p = nvn_hm_get(&by_addr, &addrs[i]); p; p = p->next_at) {
+            if (p->released) continue;
+            if (p->pub.gpu_owned) continue;   // the GPU owns its content: a re-upload would be overwritten anyway
+            p->uploaded = 0;
+            upload(p);
+            done++;
+        }
+    }
+    unlock();
+    static int traced;
+    if (!traced) {
+        traced = 1;
+        rt_log("prompts: re-uploaded %zu of %zu atlases for the device in use", done, n);
+    }
+    return (int)done;
+}
 
 void vk_texture_new_submit(void) {
     lock();

@@ -372,6 +372,7 @@ void vk_texture_census(VkTexCensus *s);
 void vk_texture_shutdown(void);                     // vk_mem_shutdown calls it
 void vk_texture_new_submit(void);                   // a queue submit starts: draw bindings check storage again
 uint32_t vk_texture_epoch(void);                    // the write-watch snapshot epoch vk_texture_new_submit started
+int vk_texture_prompts_refresh(void);               // TOTK_PROMPTS=pc: mark the prompt atlases for re-upload; returns how many
 VkSampler vk_sampler_by_id(int id);                 // VK_NULL_HANDLE for an empty slot
 VkSampler vk_sampler_for(const samp_par *s);        // cached by content
 int vk_sampler_params(int id, samp_par *out);       // parameters of a sampler slot; 0 for an empty slot

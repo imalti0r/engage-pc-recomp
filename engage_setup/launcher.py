@@ -28,6 +28,8 @@ SETTINGS = {
                    'ultra': 'Ultra performance'}),
     'sharpness': ('display', 'Sharpness', '80', {str(v): str(v) + '%' for v in range(0, 101, 5)}),
     'aspect': ('display', 'Picture shape', 'fit', {'fit': 'Black bars', 'stretch': 'Stretch'}),
+    'prompts': ('display', 'Button prompts', 'auto',
+                {'auto': 'Follow the device in use', 'switch': 'Switch buttons', 'pc': 'Keyboard and mouse'}),
     'fps_limit': ('frame rate', 'Frame rate limit', '60', {'30': '30 FPS', '60': '60 FPS'}),
     'lang': ('language', 'Game language', 'en-US', {'en-US': 'English', 'ja': 'Japanese', 'fr': 'French', 'de': 'German', 'it': 'Italian', 'es': 'Spanish', 'ko': 'Korean', 'zh-Hans': 'Chinese (simplified)', 'zh-Hant': 'Chinese (traditional)'}),
     'volume': ('audio', 'Volume', '100', {str(v): str(v) + '%' for v in range(0, 101, 10)}),

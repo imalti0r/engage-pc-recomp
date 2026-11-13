@@ -18,6 +18,7 @@
 #include "input_map.h"
 #include "input_wsys.h"
 #include "nvn_api.h"
+#include "vk_prompts.h"
 #include "ui/menu.h"
 #include "vk.h"
 #include "platform/platform.h"
@@ -434,11 +435,15 @@ static int pad_read(uint64_t *b, int32_t sl[2], int32_t sr[2]) {
 static void poll_merged(uint64_t *buttons, int32_t *lx, int32_t *ly, int32_t *rx, int32_t *ry) {
     uint64_t b = 0;
     int32_t sl[2] = {0, 0}, sr[2] = {0, 0};
+    int pad_used = 0, key_used = 0;
     plat_mutex_lock(&lock);
     if (!state) start();
     if (state > 0) {
         binds_refresh();
-        if (state == 1) pad_read(&b, sl, sr);
+        if (state == 1) {
+            pad_read(&b, sl, sr);
+            pad_used = b != 0 || sl[0] || sl[1] || sr[0] || sr[1];
+        }
         if (ikb_foreground()) {
             uint8_t down[KEY_COUNT] = {0};
             // Mouse buttons count only while the cursor is captured, and a button already held when the capture began
@@ -454,6 +459,8 @@ static void poll_merged(uint64_t *buttons, int32_t *lx, int32_t *ly, int32_t *rx
                 if (!cap || mouse_ignore[k]) down[k] = 0;
             }
             was_captured = cap;
+            for (int k = 1; k < KEY_COUNT; k++)
+                if (down[k]) key_used = 1;
             b |= input_map_buttons(down);
             int32_t k[2];
             input_map_stick(down, 0, k);
@@ -474,6 +481,10 @@ static void poll_merged(uint64_t *buttons, int32_t *lx, int32_t *ly, int32_t *rx
     int overlay = input_overlay_gate(&overlay_held, &b);
     sl[0] = st[0], sl[1] = st[1], sr[0] = st[2], sr[1] = st[3];
     plat_mutex_unlock(&lock);
+    // TOTK_PROMPTS=pc: the last device used decides which pictures the game's key prompts show. A key or mouse button
+    // wins when both arrive in one poll (a chord), so holding the pad still does not flicker the icons.
+    if (key_used) vk_prompt_icons_note_source(0);
+    else if (pad_used) vk_prompt_icons_note_source(1);
     if (toggle) menu_toggle();
     if (overlay) menu_perf_cycle();
     stick_bits(&b, sl[0], sl[1], B_SL_LEFT);

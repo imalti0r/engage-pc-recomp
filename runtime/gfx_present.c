@@ -26,6 +26,7 @@
 #include "ov.h"
 #include "ui/menu.h"
 #include "vk.h"
+#include "vk_prompts.h"
 #include "platform/platform.h"
 
 #define FRAMES 2
@@ -582,6 +583,9 @@ static void present_image(VkImage src, VkImageLayout layout, VkFormat fmt, int w
     if (cx + cw > w) cw = w - cx;
     if (cy + ch > h) ch = h - cy;
     window_settings_live();
+    // TOTK_PROMPTS=pc: the player switched between the gamepad and the keyboard/mouse since the last present. The
+    // button-prompt atlases go back to unuploaded, so this frame's bindings upload the other picture.
+    if (vk_prompt_icons_take_switch()) vk_texture_prompts_refresh();
     // The menu overlay: laid out before recording (its first frame starts the ImGui back end and uploads the font)
     const char *menu_shot = NULL;
     MenuTarget mt = {c->instance, c->phys, c->device, c->gfx_family, c->gfx_queue, g_sc_fmt, g_sc_ext.width,
