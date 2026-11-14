@@ -87,11 +87,38 @@ class PromptIconTest(unittest.TestCase):
                 coverage = (cell > 40).mean()
                 if solid:
                     # a filled cap: ink nearly everywhere, with the legend cut out of it. A wide legend (Space, PrtSc,
-                    # a two-letter key) leaves less ink, so the floor is a fifth of the cell.
-                    self.assertGreater(coverage, 0.2, f'{picture}/{name}: the filled cap has no ink')
+                    # a two-letter key) leaves less ink, and the mouse is a narrow shape by design, so the floor is a
+                    # tenth of the cell.
+                    self.assertGreater(coverage, 0.1, f'{picture}/{name}: the filled cap has no ink')
                     self.assertLess(coverage, 0.995, f'{picture}/{name}: the legend is not cut out')
                 else:
                     self.assertLess(coverage, 0.92, f'{picture}/{name}: the cell is a solid block')
+
+
+    def test_the_drawn_icon_covers_eighty_percent_of_its_cell(self):
+        """The picture is scaled to 80 % of the sprite cell and centred, so the prompts sit smaller on screen.
+
+        Measured on the drawn atlases: the ink of a wide cell spans about 0.80 of the cell's side, and the same margin
+        is left on both sides."""
+        for picture, rects in (('pc_outline', self.mpi.OUTLINE_RECTS), ('pc_filled', self.mpi.FILLED_RECTS)):
+            path = ROOT / 'build' / 'prompt-icons' / f'{picture}.png'
+            if not path.is_file():
+                self.skipTest(f'{path.name} not generated yet (run tools/make_prompt_icons.py)')
+            a = np.asarray(Image.open(path).convert('RGBA'))[:, :, 3]
+            for name, x, y, w, h in rects:
+                label = self.mpi.LABELS.get(name)
+                if label in ('mouse_l', 'mouse_r', 'mouse_look', 'arrow'):
+                    continue    # a mouse or a d-pad arrow: narrow by shape, not by the scale
+                x0, y0, x1, y1 = [int(round(v)) for v in self.mpi.box((name, x, y, w, h))]
+                cell = a[y0:y1, x0:x1] > 40
+                cols = np.where(cell.any(axis=0))[0]
+                self.assertGreater(len(cols), 0, f'{picture}/{name}: empty cell')
+                span = (cols[-1] - cols[0] + 1) / cell.shape[1]
+                self.assertAlmostEqual(span, self.mpi.ICON_SCALE, delta=0.06,
+                                       msg=f'{picture}/{name}: the icon spans {span:.2f} of its cell')
+                left, right = cols[0], cell.shape[1] - 1 - cols[-1]
+                self.assertLessEqual(abs(int(left) - int(right)), 3,
+                                     f'{picture}/{name}: the icon is not centred ({left} px left, {right} px right)')
 
 
 if __name__ == '__main__':

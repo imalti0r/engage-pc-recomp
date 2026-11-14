@@ -65,6 +65,10 @@ FILLED_RECTS = [
 STROKE = 3.0 / 40.0          # stroke width as a fraction of the cell's short side
 LEGEND = 0.60                # legend point size as a fraction of the cell's short side (17 px caps on 40 px)
 
+# The drawn icon is scaled down inside its sprite cell: the game's cell is 40 px and the picture now covers 80 % of it,
+# centred. Stroke and legend follow, because both are fractions of the drawing's own side.
+ICON_SCALE = 0.80
+
 # The key or mouse button each Switch button is pressed with (runtime/input_map.c DEFAULT_KEYS).
 LABELS = {
     'A': 'E', 'B': 'shift', 'X': 'space', 'Y': 'mouse_l',
@@ -88,15 +92,23 @@ class Pen:
     def __init__(self, d, rect):
         self.d = d
         x0, y0, x1, y1 = [v * SS for v in box(rect)]
-        self.x0, self.y0, self.x1, self.y1 = x0, y0, x1, y1
-        self.w, self.h = x1 - x0, y1 - y0
+        # the icon covers ICON_SCALE of its sprite cell, centred, so the stroke and the legend shrink with it
+        side = min(x1 - x0, y1 - y0)
+        m = side * (1.0 - ICON_SCALE) / 2
+        self.x0, self.y0, self.x1, self.y1 = x0 + m, y0 + m, x1 - m, y1 - m
+        self.w, self.h = self.x1 - self.x0, self.y1 - self.y0
         self.side = min(self.w, self.h)
         self.stroke = max(1.0, self.side * STROKE)
-        self.cx, self.cy = (x0 + x1) / 2, (y0 + y1) / 2
+        self.cx, self.cy = (self.x0 + self.x1) / 2, (self.y0 + self.y1) / 2
 
     def inset(self, f=0.0):
         """The cell shrunk by f of its side: the game's icons sit a little inside their rectangle."""
         m = self.side * f
+        return self.x0 + m, self.y0 + m, self.x1 - m, self.y1 - m
+
+    def shrink(self, f):
+        """The drawing area scaled to f of the cell, centred: the icon keeps its proportions and its stroke follows."""
+        m = self.side * (1.0 - f) / 2
         return self.x0 + m, self.y0 + m, self.x1 - m, self.y1 - m
 
     def text(self, text, px=None, max_w=None, at=None, ink=255):
