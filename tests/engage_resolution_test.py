@@ -1,6 +1,8 @@
 """Resolution startup validation and the guarded ARM64 stores, using synthetic inputs."""
 import os
 from pathlib import Path
+import math
+import re
 import struct
 import subprocess
 import sys
@@ -10,6 +12,38 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'recomp'))
 import patches
+
+
+def extra_kib(output, scale):
+    """engage_heap_extra_kib (runtime/resolution.c) mirrored here: the C in the built test.exe is the authority,
+    this computes what it must return for each case, independently. The tested inputs are plain integers and the
+    listed invalid ones, which is what strtod and this mirror disagree on never. No DLSS in these cases: the
+    stub's cfg_value answers TOTK_UPSCALER with the scale string, so the C computes shrink 1."""
+    m = re.fullmatch(r'(\d+)x(\d+)', output)
+    w, h = 1920, 1080
+    if m and int(m[1]) >= 1280 and int(m[2]) >= 720:
+        wn, hn = int(m[1]), int(m[2])
+        ok = [(1280, 720), (1600, 900), (1920, 1080), (2560, 1440), (3200, 1800), (3840, 2160)]
+        pw, ph = next(((a, b) for a, b in ok if (a, b) == (wn, hn)), (0, 0))
+        if not pw:
+            pw, ph = (1280, 720)   # the C loop keeps the last ok size at or below the window
+            for a, b in ok:
+                if a <= wn and b <= hn:
+                    pw, ph = a, b
+        w, h = pw, ph
+    pct = 0
+    if scale != 'game' and re.fullmatch(r'\d+', scale) and int(scale) > 0:
+        pct = int(scale)
+        pct = 25 if pct < 25 else 200 if pct > 200 else pct
+    if pct <= 0:
+        pct = 100   # the game's own scale stays within the draw size
+    base = 1920 * 1080
+    out = w * h
+    scene = (w * pct // 100) * (h * pct // 100)
+    if out <= base and scene <= base:
+        return 0
+    # 20 B per window pixel above 1080p (display images and UI), 32 B per scene pixel (targets and post chain)
+    return math.ceil((20 * max(0, out - base) + 32 * max(0, scene - base)) / 1024)
 
 
 class ResolutionTest(unittest.TestCase):
@@ -84,6 +118,8 @@ int rt_patch_set(const char *name) { return !strcmp(name,"engage_output") ? 0 : 
 void rt_patch_switch(int set,int on) { assert(set>=0 && set<2); enabled[set]=on; }
 void *rt_patch_page(void) { return page; }
 void rt_log(const char *fmt,...) {}
+int mem_pool_grow(uint64_t extra) { (void)extra; return 0; }   // the boot sizing already covered it in every case
+int mem_pool_pinned(void) { return 0; }   // no TOTK_APP_POOL in these cases: the cap follows the settings
 void oe_push_message(unsigned message) {}
 void ov_operation_mode_flip(void) {}
 int ov_op_flipped(void) { return 0; }
@@ -92,7 +128,7 @@ int gfx_window_monitor_size(int *w, int *h) { *w = 0; *h = 0; return 0; }
 void fs_init(void) { abort(); }
 int cfg_int(const char *key) { abort(); }
 int main(int argc,char **argv) {
- assert(argc==6); output=argv[1]; scale=argv[2];
+ assert(argc==7); output=argv[1]; scale=argv[2];
  res_init();
  unsigned w,h; float k;
  memcpy(&w,page+64,4); memcpy(&h,page+68,4); memcpy(&k,page+72,4);
@@ -102,7 +138,9 @@ int main(int argc,char **argv) {
  assert(enabled[0]==1);
  assert(enabled[1]==atoi(argv[4]));
  assert(k==(float)atof(argv[5]));
- assert(res_heap_extra_kib()==0);
+ // the guest pool extra (engage_heap_extra_kib): above Switch's retail pool exactly when the session draws or
+ // scales above 1920x1080
+ assert(res_heap_extra_kib()==strtoull(argv[6],NULL,10));
 }
 ''')
             cc = os.environ.get('CC', str(ROOT / 'toolchain/engage/llvm/bin/clang.exe'))
@@ -126,7 +164,8 @@ int main(int argc,char **argv) {
                       for value in ('nan', 'inf', '0', 'bad', '75%')]
             for case in cases:
                 with self.subTest(case=case):
-                    subprocess.run([str(exe), *map(str, case)], check=True, capture_output=True)
+                    subprocess.run([str(exe), *map(str, (*case, extra_kib(case[0], case[1])))],
+                                   check=True, capture_output=True)
 
 
 if __name__ == '__main__':

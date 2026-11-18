@@ -50,6 +50,7 @@ static RtGuestLayout L;
 static uint64_t mods_lo, mods_hi;   // fixed module window
 static PlatMutex lock = PLAT_MUTEX_INIT;
 static uint64_t heap_size, alias_bytes;
+static int pool_pinned;             // TOTK_APP_POOL was set: the cap stays for the whole session
 static uint8_t *alias_pages;        // 1 per mapped 4 KiB page of the alias region
 typedef struct { uint64_t dst, src, size; } StackMap;
 static StackMap stack_maps[MAX_STACK_MAPS];
@@ -235,6 +236,7 @@ void mem_init(void) {
     // depends on TOTK_APP_POOL and on the resolution settings (resolution.c decides them once, on this first call).
     cfg_init();
     const char *pool = cfg_get("TOTK_APP_POOL");
+    pool_pinned = pool != NULL;   // an explicit pool is the session's cap: live resolution changes do not raise it
     L = (RtGuestLayout){
         .aslr = {low, RT_ADDRESS_LIMIT - low},
         .stack = {low + STACK_OFF, STACK_SIZE},
@@ -248,6 +250,8 @@ void mem_init(void) {
 }
 
 const RtGuestLayout *mem_layout(void) { return &L; }
+
+int mem_pool_pinned(void) { return pool_pinned; }   // TOTK_APP_POOL was set: the cap stays for the whole session
 
 // A range inside one watched reservation (stack and heap block, or alias region) only.
 static uint64_t written_pages(uint64_t addr, uint64_t size, uint64_t *pages, uint64_t max, int reset) {
@@ -461,14 +465,36 @@ static uint32_t alias_map(int unmap, uint64_t a, uint64_t n) {
     }
 out:
     plat_mutex_unlock(&lock);
-    if (r) rt_log("%sMapPhysicalMemory %#llx+%#llx failed %#x (alias %#llx used, heap %#llx)", unmap ? "Un" : "",
+    // The pool cap in the message is what makes a reporter's log self-explanatory: the ask, what is already used
+    // and the ceiling it did not fit (resolution.c raises the cap above Switch's retail for big windows).
+    if (r) rt_log("%sMapPhysicalMemory %#llx+%#llx failed %#x (alias %#llx used, heap %#llx, pool %#llx)", unmap ? "Un" : "",
                   (unsigned long long)a, (unsigned long long)n, r, (unsigned long long)alias_bytes,
-                  (unsigned long long)heap_size);
+                  (unsigned long long)heap_size, (unsigned long long)L.pool);
     return r;
 }
 
 uint32_t mem_map_physical(uint64_t a, uint64_t n) { return alias_map(0, a, n); }
 uint32_t mem_unmap_physical(uint64_t a, uint64_t n) { return alias_map(1, a, n); }
+
+// A live resolution change (resolution.c) can need a larger pool than the settings mem_init sized it for: raise the
+// cap. Grows only, so a smaller scale keeps the headroom for a later change back up; an explicit TOTK_APP_POOL
+// stays the session's cap. Nothing pre-commits: alias pages commit only when the game maps them.
+int mem_pool_grow(uint64_t extra) {
+    plat_mutex_lock(&lock);
+    int grew = !pool_pinned && L.pool < DEFAULT_POOL + extra;
+    if (grew) L.pool = DEFAULT_POOL + extra;
+    plat_mutex_unlock(&lock);
+    return grew;
+}
+
+// What counts against the pool cap right now, for a fatal's numbers (nvn_api_obj.c): a full guest pool is the
+// usual reason a texture view arrives unusable.
+void mem_pool_pressure(uint64_t *used, uint64_t *cap) {
+    plat_mutex_lock_shared(&lock);
+    *used = alias_bytes + heap_size + image_bytes();
+    plat_mutex_unlock_shared(&lock);
+    *cap = L.pool;
+}
 
 // ---- 0x06 QueryMemory
 // The region around a that no known region covers: everything else below 2^39 belongs to the host and is reported

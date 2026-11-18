@@ -142,6 +142,9 @@ uint32_t mem_unmap(uint64_t dst, uint64_t src, uint64_t n);                     
 uint32_t mem_query(uint64_t a, RtMemoryInfo *out);                              // 0x06
 uint32_t mem_map_physical(uint64_t a, uint64_t n);                              // 0x2C
 uint32_t mem_unmap_physical(uint64_t a, uint64_t n);                            // 0x2D
+int mem_pool_grow(uint64_t extra);                                              // a live resolution change raises the cap; 1 if it did
+int mem_pool_pinned(void);                                                      // an explicit TOTK_APP_POOL pins the cap for the session
+void mem_pool_pressure(uint64_t *used, uint64_t *cap);                           // alias+heap+image bytes against the cap
 int mem_info(uint32_t id, uint64_t *out);                  // GetInfo memory ids 2-7, 12-17, 21, 22, 28; 0 if not a memory id
 void *mem_kernel_alloc(uint64_t size, uint64_t align);     // zeroed, guest-visible, in the kernel region; align <= 64 KiB
 uint64_t mem_written_pages(uint64_t addr, uint64_t size, uint64_t *pages, uint64_t max);

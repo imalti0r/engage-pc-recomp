@@ -35,6 +35,26 @@ A window size that is not one of the six 16:9 sizes Engage draws (1280×720 …
 percentages outside 50–150 fall back to Game. Window scaling, FSR presentation
 and color adjustment remain separate settings.
 
+## Guest memory
+
+The game's render textures live in guest memory it maps itself, and a scene
+change allocates the next scene's targets while the previous ones are still
+mapped, so what has to fit the pool is the peak, not the average. Switch's
+retail application pool (3.2 GiB) covers a 1080p session; a 4K window with the
+scene supersampled past 100 % does not — the pool allocation fails and the game
+crashes at the scene change (`texture view levels -1/1` in the log, with the
+failed `MapPhysicalMemory` lines above it).
+
+So the port raises the pool cap for the window size and the 3D scale: 20
+bytes per window pixel above 1920×1080 — the display images and the UI are
+window-sized even when DLSS makes the game draw smaller — and 32 bytes per
+scene pixel the game draws above 1080p. The pool is a cap, not an
+allocation — nothing is committed until the game maps it — and a session at
+1080p with the game's own scale keeps Switch's exact retail value. The 3D
+scale can change while the game runs, so a scale change raises the cap again
+before the game rebuilds its buffers; scaling back down keeps the headroom,
+and an explicit `TOTK_APP_POOL` stays the session's cap.
+
 The guarded Engage patch table changes Unity's screen manager, NVN display-buffer
 storage sizing, device extent and default depth-buffer dimensions together. Changing
 only the screen manager leaves a 1080p buffer and clips the scene/UI at smaller

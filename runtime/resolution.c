@@ -122,8 +122,72 @@ static int bigger(void) {
     return R.ow != BASE_W || R.oh != BASE_H || R.scene_set;
 }
 
+// What the settings tell Engage to draw, in the six 16:9 sizes the game takes: 0 a size as given, 1 a window that
+// is not one of them (the nearest size below), -1 TOTK_WINDOW_SIZE is not <width>x<height> at all (the game's own
+// 1920x1080). engage_apply logs the last two; engage_heap_extra_kib takes whatever came out as the session's draw
+// size. Both read the same setting, so the guest pool always covers what the game was told to draw.
+static float dlss_shrink(void);   // defined below engage_apply's helpers; the pool sizing runs before it
+static int engage_window_size(unsigned *w, unsigned *h) {
+    *w = BASE_W, *h = BASE_H;
+    unsigned wn = 0, hn = 0;
+    char tail;
+    if (sscanf(cfg_value("TOTK_WINDOW_SIZE"), "%ux%u%c", &wn, &hn, &tail) != 2 || wn < 1280 || hn < 720) return -1;
+    static const unsigned kOk[][2] = {{1280, 720}, {1600, 900}, {1920, 1080}, {2560, 1440}, {3200, 1800}, {3840, 2160}};
+    unsigned pw = 0, ph = 0;
+    for (size_t i = 0; i < sizeof kOk / sizeof *kOk; i++)
+        if (kOk[i][0] == wn && kOk[i][1] == hn) pw = wn, ph = hn;
+    if (!pw) {
+        for (size_t i = 0; i < sizeof kOk / sizeof *kOk; i++)
+            if (kOk[i][0] <= wn && kOk[i][1] <= hn) pw = kOk[i][0], ph = kOk[i][1];
+        if (!pw) pw = 1280, ph = 720;
+    }
+    *w = pw, *h = ph;
+    return pw != wn || ph != hn;
+}
+
+// TOTK_RENDER_SCALE the way the menu takes it: 25..200, or 0 for "game" and anything unparsable. One reading for
+// the page (engage_apply) and the pool (engage_heap_extra_kib): the settings menu can change the scale while the
+// game runs, so both must agree on what a value means.
+static int engage_scale_pct(void) {
+    const char *s = cfg_value("TOTK_RENDER_SCALE");
+    if (!strcmp(s, "game")) return 0;
+    char *end;
+    double pct = strtod(s, &end);
+    if (end == s || *end || !isfinite(pct) || pct <= 0) return 0;
+    if (pct < 25) return 25;
+    return pct > 200 ? 200 : (int)lround(pct);
+}
+
+// Engage: guest memory above Switch's retail pool that this session's window size and 3D scale need. The game's
+// render textures live in guest memory it maps (MapPhysicalMemory), and a scene change allocates the next scene's
+// targets while the previous ones are still mapped, so the peak — not the steady state — has to fit. The display
+// images and the UI are sized by the window (the engage_output patches write it into Unity's screen manager) even
+// when DLSS makes the game draw smaller: a 4K window with DLSS Performance drawing 1080p still maps 4K display
+// buffers. A long session of such a size ran Switch's retail pool out exactly at a scene change: the game's pool
+// allocation failed, and the texture it then built from the failed pool arrived with no mip levels ("texture view
+// levels -1/1", issue #2 — the first retry wanted 73 MiB more than retail). The two budgets are bytes per pixel
+// above the 1920x1080 session the retail pool was sized for — 20 per window pixel for the three display images,
+// their depth and the UI, 32 per scene pixel for the scene's colour and depth targets and the post chain that
+// reads them. The pool is a cap, not an allocation (memory.c commits only the pages the game maps), so a generous
+// budget costs address space that is never touched, while a tight one crashes at a scene change.
+static uint64_t engage_heap_extra_kib(void) {
+    unsigned w, h;
+    engage_window_size(&w, &h);
+    int pct = engage_scale_pct();
+    // The DLSS mode divides what the game draws (engage_apply); with DLSS the scene is draw-sized whatever the
+    // 3D scale says.
+    const float shrink = !strcmp(cfg_value("TOTK_UPSCALER"), "dlss") ? dlss_shrink() : 1.0f;
+    if (pct <= 0) pct = 100;   // the game's own scale stays within the draw size (measured 83 % in a map)
+    unsigned dw = (unsigned)(w / shrink + 0.5f), dh = (unsigned)(h / shrink + 0.5f);
+    uint64_t base = (uint64_t)BASE_W * BASE_H;
+    uint64_t out = (uint64_t)w * h, scene = (uint64_t)(dw * pct / 100) * (dh * pct / 100);
+    if (out <= base && scene <= base) return 0;   // the session Switch's retail pool was sized for
+    double bytes = 20.0 * (double)(out > base ? out - base : 0) + 32.0 * (double)(scene > base ? scene - base : 0);
+    return (uint64_t)ceil(bytes / 1024.0);
+}
+
 uint64_t res_heap_extra_kib(void) {
-    if (RT_ENGAGE) return 0;
+    if (RT_ENGAGE) return engage_heap_extra_kib();
     if (!bigger()) return 0;
     double grow = fmax(0.0, (double)R.ow * R.oh / (BASE_W * BASE_H) - 1.0) +
                   fmax(0.0, (double)R.sw * R.sh / (SCENE_W * SCENE_H) - 1.0);
@@ -269,30 +333,18 @@ void res_engage_sizes(unsigned draw[2], unsigned target[2]) {
 // every settings change (res_engage_live): the game reads these values when it builds its buffers and camera, so the
 // change reaches the game without a restart.
 static void engage_apply(const char *why) {
-    unsigned w = BASE_W, h = BASE_H;
-    const char *s = cfg_value("TOTK_RENDER_SCALE");
     // The window is the resolution: one setting, not a separate game size. The game composes its picture in the
     // window's size, and DLSS's mode divides that into what it renders. A picture larger than the window would be
-    // scaled back down on its way to the screen, throwing away what DLSS upscaled.
-    unsigned int wn = 0, hn = 0;
-    char tail;
-    if (sscanf(cfg_value("TOTK_WINDOW_SIZE"), "%ux%u%c", &wn, &hn, &tail) == 2 && wn >= 1280 && hn >= 720) {
-        // Engage takes 16:9 sizes from its smallest (1280x720) up to 3840x2160: anything else falls back
-        // to the 16:9 size nearest below the window, so the picture never spills past the screen.
-        static const unsigned kOk[][2] = {{1280, 720}, {1600, 900}, {1920, 1080}, {2560, 1440}, {3200, 1800}, {3840, 2160}};
-        unsigned pick_w = 0, pick_h = 0;
-        for (size_t i = 0; i < sizeof kOk / sizeof *kOk; i++)
-            if (kOk[i][0] == wn && kOk[i][1] == hn) pick_w = wn, pick_h = hn;
-        if (!pick_w) {
-            for (size_t i = 0; i < sizeof kOk / sizeof *kOk; i++)
-                if (kOk[i][0] <= wn && kOk[i][1] <= hn) pick_w = kOk[i][0], pick_h = kOk[i][1];
-            if (!pick_w) pick_w = 1280, pick_h = 720;
-        }
-        if (pick_w != wn || pick_h != hn)
-            rt_log("resolution: the %ux%u window is not a 16:9 size Engage draws; the game uses %ux%u", wn, hn, pick_w, pick_h);
-        w = pick_w, h = pick_h;
-    } else rt_log("resolution: TOTK_WINDOW_SIZE=%s is not <width>x<height>; the game draws 1920x1080",
-                  cfg_value("TOTK_WINDOW_SIZE"));
+    // scaled back down on its way to the screen, throwing away what DLSS upscaled. engage_window_size parses the
+    // setting (one of Engage's six 16:9 sizes, the nearest one below a window that is not such a size).
+    unsigned w, h;
+    int win = engage_window_size(&w, &h);
+    if (win < 0)
+        rt_log("resolution: TOTK_WINDOW_SIZE=%s is not <width>x<height>; the game draws 1920x1080",
+              cfg_value("TOTK_WINDOW_SIZE"));
+    else if (win > 0)
+        rt_log("resolution: the window size %s is not a 16:9 size Engage draws; the game uses %ux%u",
+              cfg_value("TOTK_WINDOW_SIZE"), w, h);
     E_target[0] = w & ~1u, E_target[1] = h & ~1u;
     // DLSS Quality/Performance/Ultra Performance: the game draws smaller and DLSS upscales to the size above,
     // which is what the window presents (vk_dlss.cpp takes its output from res_engage_target). DLSS accepts inputs
@@ -306,6 +358,8 @@ static void engage_apply(const char *why) {
             w = rw, h = rh;
         } else rt_log("resolution: DLSS x%.2f on %ux%u would draw below 640x360; the game keeps %ux%u", shrink, w, h, w, h);
     }
+    const char *s = cfg_value("TOTK_RENDER_SCALE");
+    int pct = engage_scale_pct();
     float scale = 1;
     int fixed = strcmp(s, "game") != 0;
     // DLSS already divides the game resolution by its mode's ratio to decide what the game draws. A second shrink from
@@ -316,20 +370,16 @@ static void engage_apply(const char *why) {
     if (dlss) {
         fixed = 1;
         scale = 1.0f;
-    } else if (fixed) {
-        // Any percentage the player types, 25..200 (the menu's field allows the same range): clamped to the limits and
-        // rounded to a whole percent. Below 25 the scene would be too coarse to see; above 200 the texture heap and the
-        // GPU time grow far faster than the picture improves.
-        char *end;
-        double pct = strtod(s, &end);
-        if (end != s && !*end && isfinite(pct) && pct > 0) {
-            if (pct < 25) pct = 25;
-            if (pct > 200) pct = 200;
-            scale = (float)(lround(pct) / 100.0);
-        } else {
-            fixed = 0;
+    } else if (pct > 0) {
+        // Any percentage the player types, 25..200 (the menu's field allows the same range): clamped to the limits
+        // and rounded to a whole percent. Below 25 the scene would be too coarse to see; above 200 the guest pool
+        // and the GPU time grow far faster than the picture improves.
+        fixed = 1;
+        scale = pct / 100.0f;
+    } else {
+        fixed = 0;
+        if (strcmp(s, "game"))
             rt_log("resolution: Engage render scale %s is not a percentage; using game", s);
-        }
     }
     int output = rt_patch_set("engage_output"), scene = rt_patch_set("engage_scene");
     if (output < 0 || scene < 0) {
@@ -352,10 +402,25 @@ static void engage_apply(const char *why) {
     E_scene[0] = (unsigned)(w * scale + 0.5f), E_scene[1] = (unsigned)(h * scale + 0.5f);
     rt_log("resolution: Engage output %ux%u, 3D scale %s%s (%s)", w, h,
            dlss ? "100" : s, dlss ? "% (DLSS sets the ratio)" : fixed ? "%" : " (game controlled)", why);
+    // The settings menu can raise the scale while the game runs and push it to rebuild its buffers for the change
+    // (res_engage_live): the guest pool must cover the new scene before that rebuild starts. mem_init sized the
+    // pool from the settings the session started with; mem_pool_grow only raises, so scaling back down keeps the
+    // headroom, and an explicit TOTK_APP_POOL (mem_init) pins the cap for the whole session. The pool sizing reads
+    // the raw scale, not the DLSS-pinned one: the upscaler is itself a live setting.
+    uint64_t extra = res_heap_extra_bytes();
+    if (mem_pool_grow(extra))
+        rt_log("resolution: Engage guest pool raised to %llu MiB above Switch's retail for the 3D scale (%s)",
+               (unsigned long long)(extra >> 20), why);
 }
 
 static void engage_init(void) {
     engage_apply("start");
+    // The guest pool mem_init already sized from these same settings: name the extra once, so a log that runs out
+    // of guest memory at a scene change says what it had above Switch's retail pool.
+    uint64_t extra = res_heap_extra_bytes();
+    if (extra)
+        rt_log("resolution: Engage guest pool %llu MiB above Switch's retail for the window size and 3D scale%s",
+               (unsigned long long)(extra >> 20), mem_pool_pinned() ? " (TOTK_APP_POOL pins this session's cap)" : "");
     // the live path remembers what start already applied, so the first settings change is the first change
     snprintf(g_live_res, sizeof g_live_res, "%s", cfg_value("TOTK_OUTPUT_RES"));
     snprintf(g_live_up, sizeof g_live_up, "%s", cfg_value("TOTK_UPSCALER"));

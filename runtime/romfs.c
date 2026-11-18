@@ -359,6 +359,7 @@ static void added_init(void) {
 // written to <profile>/resolution/ and served in the base's place.
 #define HEAPDEF "System/HeapSize/Product.Nin_NX_NVN.HeapDef.byml.zs"
 static void heapdef_overlay(void) {
+    if (RT_ENGAGE) return;   // Unity game: no agl HeapDef table; the pool (memory.c) alone carries Engage's extra
     if (!res_heap_extra_kib()) return;
     uint64_t i = lower(HEAPDEF);
     if (i >= file_count || strcmp(entry_name(entry(i)), HEAPDEF)) {

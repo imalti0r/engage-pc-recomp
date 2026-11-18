@@ -242,7 +242,19 @@ NVN_API(nvnTextureGetRawStorageClass) { ret_x(c, 1); }
 NVN_API(nvnTextureViewSetDefaults) { memset(arg_p(c, 0), 0, sizeof(view_t)); }
 NVN_API(nvnTextureViewSetLevels) {
     uint32_t base = (uint32_t)arg_x(c, 1), n = (uint32_t)arg_x(c, 2);
-    if (base > 255 || n > 255) rt_fatal("nvn: texture view levels %d/%d", (int)base, (int)n);
+    if (base > 255 || n > 255) {
+        uint64_t used, cap;
+        mem_pool_pressure(&used, &cap);
+        if (base == 0xffffffff) {
+            // The game computed this view's base level from a texture that has no levels: the pool it wanted to
+            // allocate from failed first, so name the cause and the guest pool's numbers (the MapPhysicalMemory
+            // failures a few lines up in the log are that failure; issue #2 has the full chain).
+            rt_fatal("nvn: texture view levels %d/%d: a failed pool allocation left the texture empty (guest memory "
+                     "%#llx of %#llx)", (int)base, (int)n, (unsigned long long)used, (unsigned long long)cap);
+        }
+        rt_fatal("nvn: texture view levels %d/%d (guest memory %#llx of %#llx)", (int)base, (int)n,
+                 (unsigned long long)used, (unsigned long long)cap);
+    }
     view_t *v = VW(c);
     v->set_levels = 1;
     v->base_level = (uint8_t)base;
